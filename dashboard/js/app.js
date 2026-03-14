@@ -150,6 +150,7 @@ function getNavHTML() {
       <a href="reminders.html">תזכורות</a>
       <a href="settings.html">הגדרות</a>
       <a href="export.html">ייצוא</a>
+      <a href="guide.html">מדריך</a>
       <a href="#" onclick="sessionStorage.removeItem('dashToken');location.href='/dashboard/login.html'" style="margin-right:auto">יציאה</a>
     </nav>`;
 }
