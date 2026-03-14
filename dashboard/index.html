@@ -113,12 +113,28 @@
           var text = document.createElement('span');
           text.className = 'feed-text';
 
+          // Direction badge
+          var dirBadge = document.createElement('span');
+          dirBadge.className = m.direction === 'outgoing' ? 'badge badge-info' : 'badge badge-warning';
+          dirBadge.style.fontSize = '0.7rem';
+          dirBadge.style.marginLeft = '0.4rem';
+          dirBadge.textContent = m.direction === 'outgoing' ? 'נשלח' : 'התקבל';
+          text.appendChild(dirBadge);
+
+          // Channel badge
+          var chBadge = document.createElement('span');
+          chBadge.className = m.channel === 'whatsapp' ? 'badge badge-success' : 'badge badge-secondary';
+          chBadge.style.fontSize = '0.65rem';
+          chBadge.style.marginLeft = '0.4rem';
+          chBadge.textContent = m.channel === 'whatsapp' ? 'WA' : 'SMS';
+          text.appendChild(chBadge);
+
           var strong = document.createElement('strong');
-          strong.textContent = m.guest_name || 'לא ידוע';
+          strong.textContent = ' ' + (m.guest_name || 'לא ידוע');
           text.appendChild(strong);
 
-          var arrow = document.createTextNode(' ' + (m.direction === 'outgoing' ? '←' : '→') + ' ');
-          text.appendChild(arrow);
+          var sep = document.createTextNode(': ');
+          text.appendChild(sep);
 
           var body = m.content || '';
           var bodyText = document.createTextNode(body.length > 80 ? body.substring(0, 80) + '...' : body);
