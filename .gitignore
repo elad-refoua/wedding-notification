@@ -3,6 +3,7 @@ node_modules/
 *.db
 *.db-journal
 backups/
+exports/
 nul
 .DS_Store
 Thumbs.db
