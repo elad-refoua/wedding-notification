@@ -34,6 +34,11 @@ app.use('/dashboard', authMiddleware, express.static(path.join(__dirname, 'dashb
 // Twilio webhooks (no auth middleware — validated via Twilio signature)
 app.use('/webhooks', require('./src/routes/webhooks'));
 
+// Root redirect to dashboard
+app.get('/', (req, res) => {
+  res.redirect('/dashboard/');
+});
+
 // Health check
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
