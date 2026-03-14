@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ניהול חתונה — הודעות</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">💍 ניהול חתונה</span>
+    <a href="index.html">בית</a>
+    <a href="guests.html">אורחים</a>
+    <a href="messages.html">הודעות</a>
+    <a href="reminders.html">תזכורות</a>
+    <a href="settings.html">הגדרות</a>
+    <a href="export.html">ייצוא</a>
+  </nav>
+
+  <div class="container">
+    <h1 class="page-title">יומן הודעות</h1>
+
+    <!-- Filters -->
+    <div class="filter-row">
+      <div class="form-group">
+        <label>כיוון</label>
+        <select id="filterDirection">
+          <option value="">הכל</option>
+          <option value="incoming">נכנס</option>
+          <option value="outgoing">יוצא</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>ערוץ</label>
+        <select id="filterChannel">
+          <option value="">הכל</option>
+          <option value="sms">SMS</option>
+          <option value="whatsapp">WhatsApp</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>זמן</th>
+            <th>אורח</th>
+            <th>כיוון</th>
+            <th>ערוץ</th>
+            <th>תוכן</th>
+            <th>סטטוס</th>
+          </tr>
+        </thead>
+        <tbody id="messagesBody">
+          <tr><td colspan="6" class="empty-state"><span class="spinner"></span> טוען...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    // NOTE: All dynamic content built with safe DOM methods (textContent, createElement).
+    // This is a local admin dashboard behind auth middleware.
+    async function loadMessages() {
+      try {
+        var params = new URLSearchParams();
+        var direction = document.getElementById('filterDirection').value;
+        var channel = document.getElementById('filterChannel').value;
+        if (direction) params.set('direction', direction);
+        if (channel) params.set('channel', channel);
+
+        var messages = await api('/messages?' + params.toString());
+        var tbody = document.getElementById('messagesBody');
+        tbody.textContent = '';
+
+        if (!messages.length) {
+          var tr = document.createElement('tr');
+          var td = document.createElement('td');
+          td.colSpan = 6;
+          td.className = 'empty-state';
+          td.textContent = 'אין הודעות להצגה';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+
+        messages.forEach(function(m) {
+          var tr = document.createElement('tr');
+
+          var tdTime = document.createElement('td');
+          tdTime.style.whiteSpace = 'nowrap';
+          tdTime.textContent = formatDate(m.created_at);
+          tr.appendChild(tdTime);
+
+          var tdGuest = document.createElement('td');
+          tdGuest.textContent = m.guest_name || 'לא ידוע';
+          tr.appendChild(tdGuest);
+
+          var tdDir = document.createElement('td');
+          var dirBadge = document.createElement('span');
+          dirBadge.className = m.direction === 'outgoing' ? 'badge badge-info' : 'badge badge-warning';
+          dirBadge.textContent = m.direction === 'outgoing' ? 'יוצא ←' : 'נכנס →';
+          tdDir.appendChild(dirBadge);
+          tr.appendChild(tdDir);
+
+          var tdChannel = document.createElement('td');
+          var chBadge = document.createElement('span');
+          chBadge.className = m.channel === 'whatsapp' ? 'badge badge-success' : 'badge badge-secondary';
+          chBadge.textContent = m.channel === 'whatsapp' ? 'WA' : 'SMS';
+          tdChannel.appendChild(chBadge);
+          tr.appendChild(tdChannel);
+
+          var tdBody = document.createElement('td');
+          tdBody.style.maxWidth = '350px';
+          tdBody.style.overflow = 'hidden';
+          tdBody.style.textOverflow = 'ellipsis';
+          tdBody.style.whiteSpace = 'nowrap';
+          tdBody.textContent = m.body || '';
+          tr.appendChild(tdBody);
+
+          var tdStatus = document.createElement('td');
+          var sBadge = document.createElement('span');
+          sBadge.className = statusClass(m.status);
+          sBadge.textContent = statusLabel(m.status);
+          tdStatus.appendChild(sBadge);
+          tr.appendChild(tdStatus);
+
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+      }
+    }
+
+    document.getElementById('filterDirection').addEventListener('change', loadMessages);
+    document.getElementById('filterChannel').addEventListener('change', loadMessages);
+
+    document.addEventListener('DOMContentLoaded', loadMessages);
+  </script>
+</body>
+</html>

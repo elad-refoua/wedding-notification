@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ניהול חתונה — ייצוא</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">💍 ניהול חתונה</span>
+    <a href="index.html">בית</a>
+    <a href="guests.html">אורחים</a>
+    <a href="messages.html">הודעות</a>
+    <a href="reminders.html">תזכורות</a>
+    <a href="settings.html">הגדרות</a>
+    <a href="export.html">ייצוא</a>
+  </nav>
+
+  <div class="container">
+    <h1 class="page-title">ייצוא לאקסל</h1>
+
+    <!-- Filter -->
+    <div class="filter-row">
+      <div class="form-group">
+        <label>סינון לפי סטטוס</label>
+        <select id="exportStatus">
+          <option value="">הכל</option>
+          <option value="coming">מגיע</option>
+          <option value="not_coming">לא מגיע</option>
+          <option value="undecided">מתלבט</option>
+          <option value="pending">ממתין</option>
+          <option value="invited">הוזמן</option>
+          <option value="opted_out">הוסר</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>&nbsp;</label>
+        <button class="btn btn-success" onclick="downloadExcel()">ייצוא לאקסל</button>
+      </div>
+    </div>
+
+    <!-- Preview Table -->
+    <div class="card" style="margin-bottom:1rem;">
+      <h2 style="font-size:1rem; margin-bottom:0.5rem;">תצוגה מקדימה (<span id="previewCount">0</span> אורחים)</h2>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>שם</th>
+            <th>טלפון</th>
+            <th>צד</th>
+            <th>קבוצה</th>
+            <th>סטטוס</th>
+            <th>מוזמנים</th>
+            <th>מגיעים</th>
+          </tr>
+        </thead>
+        <tbody id="previewBody">
+          <tr><td colspan="7" class="empty-state"><span class="spinner"></span> טוען...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    // NOTE: All dynamic content built with safe DOM methods (textContent, createElement).
+    async function loadPreview() {
+      try {
+        var status = document.getElementById('exportStatus').value;
+        var params = new URLSearchParams();
+        if (status) params.set('status', status);
+
+        var guests = await api('/guests?' + params.toString());
+        document.getElementById('previewCount').textContent = guests.length;
+        var tbody = document.getElementById('previewBody');
+        tbody.textContent = '';
+
+        if (!guests.length) {
+          var tr = document.createElement('tr');
+          var td = document.createElement('td');
+          td.colSpan = 7;
+          td.className = 'empty-state';
+          td.textContent = 'אין אורחים להצגה';
+          tr.appendChild(td);
+          tbody.appendChild(tr);
+          return;
+        }
+
+        guests.forEach(function(g) {
+          var tr = document.createElement('tr');
+
+          var tdName = document.createElement('td');
+          tdName.textContent = g.name;
+          tr.appendChild(tdName);
+
+          var tdPhone = document.createElement('td');
+          tdPhone.dir = 'ltr';
+          tdPhone.style.textAlign = 'right';
+          tdPhone.textContent = g.phone;
+          tr.appendChild(tdPhone);
+
+          var tdSide = document.createElement('td');
+          tdSide.textContent = sideLabel(g.side);
+          tr.appendChild(tdSide);
+
+          var tdGroup = document.createElement('td');
+          tdGroup.textContent = g.group_name || '';
+          tr.appendChild(tdGroup);
+
+          var tdStatus = document.createElement('td');
+          var badge = document.createElement('span');
+          badge.className = statusClass(g.status);
+          badge.textContent = statusLabel(g.status);
+          tdStatus.appendChild(badge);
+          tr.appendChild(tdStatus);
+
+          var tdInvited = document.createElement('td');
+          tdInvited.textContent = g.num_invited || 0;
+          tr.appendChild(tdInvited);
+
+          var tdComing = document.createElement('td');
+          tdComing.textContent = g.num_coming || 0;
+          tr.appendChild(tdComing);
+
+          tbody.appendChild(tr);
+        });
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+      }
+    }
+
+    function downloadExcel() {
+      var status = document.getElementById('exportStatus').value;
+      var params = new URLSearchParams();
+      if (status) params.set('status', status);
+      window.location.href = '/api/export?' + params.toString();
+    }
+
+    document.getElementById('exportStatus').addEventListener('change', loadPreview);
+
+    document.addEventListener('DOMContentLoaded', loadPreview);
+  </script>
+</body>
+</html>

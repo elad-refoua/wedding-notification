@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ניהול חתונה — הגדרות</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">💍 ניהול חתונה</span>
+    <a href="index.html">בית</a>
+    <a href="guests.html">אורחים</a>
+    <a href="messages.html">הודעות</a>
+    <a href="reminders.html">תזכורות</a>
+    <a href="settings.html">הגדרות</a>
+    <a href="export.html">ייצוא</a>
+  </nav>
+
+  <div class="container">
+    <h1 class="page-title">הגדרות מערכת</h1>
+
+    <form id="settingsForm" class="card" onsubmit="saveSettings(event)">
+      <div class="settings-grid">
+        <!-- Templates -->
+        <div class="form-group full-width">
+          <label>תבנית הזמנה</label>
+          <textarea id="sInviteTemplate" rows="4" placeholder="שלום {name}, אתם מוזמנים לחתונה שלנו!"></textarea>
+        </div>
+        <div class="form-group full-width">
+          <label>תבנית תזכורת</label>
+          <textarea id="sReminderTemplate" rows="4" placeholder="שלום {name}, רק רצינו לוודא - האם אתם מגיעים?"></textarea>
+        </div>
+
+        <!-- Reminder Settings -->
+        <div class="form-group">
+          <label>מרווח תזכורות (ימים)</label>
+          <input type="number" id="sReminderInterval" min="1" value="3">
+        </div>
+        <div class="form-group">
+          <label>מקסימום תזכורות</label>
+          <input type="number" id="sMaxReminders" min="1" value="3">
+        </div>
+
+        <!-- Scheduling -->
+        <div class="form-group">
+          <label>שעת דוח יומי</label>
+          <input type="time" id="sDailyReportTime" value="09:00">
+        </div>
+        <div class="form-group">
+          <label>גודל אצווה</label>
+          <input type="number" id="sBatchSize" min="1" value="20">
+        </div>
+
+        <div class="form-group">
+          <label>השהיה בין אצוות (שניות)</label>
+          <input type="number" id="sBatchDelay" min="1" value="5">
+        </div>
+        <div class="form-group" style="display:flex; align-items:center; gap:0.75rem; padding-top:1.5rem;">
+          <input type="checkbox" id="sWhatsappEnabled">
+          <label for="sWhatsappEnabled" style="margin:0; color:#f1f5f9; font-size:0.95rem;">WhatsApp מופעל</label>
+        </div>
+
+        <!-- Admin -->
+        <div class="form-group full-width">
+          <label>טלפוני מנהלים (מופרד בפסיק)</label>
+          <input type="text" id="sAdminPhones" dir="ltr" placeholder="0501234567, 0529876543">
+        </div>
+        <div class="form-group full-width">
+          <label>אבני דרך (מופרד בפסיק)</label>
+          <input type="text" id="sMilestones" placeholder="100, 200, 300, 400">
+        </div>
+      </div>
+
+      <div style="margin-top:1.5rem;">
+        <button type="submit" class="btn btn-primary">שמור הגדרות</button>
+      </div>
+    </form>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    const SETTINGS_MAP = {
+      invite_template: 'sInviteTemplate',
+      reminder_template: 'sReminderTemplate',
+      reminder_interval_days: 'sReminderInterval',
+      max_reminders: 'sMaxReminders',
+      daily_report_time: 'sDailyReportTime',
+      batch_size: 'sBatchSize',
+      batch_delay_seconds: 'sBatchDelay',
+      whatsapp_enabled: 'sWhatsappEnabled',
+      admin_phones: 'sAdminPhones',
+      milestones: 'sMilestones'
+    };
+
+    async function loadSettings() {
+      try {
+        const settings = await api('/settings');
+        for (const [key, elId] of Object.entries(SETTINGS_MAP)) {
+          const el = document.getElementById(elId);
+          if (!el || settings[key] === undefined) continue;
+          if (el.type === 'checkbox') {
+            el.checked = settings[key] === 'true' || settings[key] === true;
+          } else {
+            el.value = settings[key];
+          }
+        }
+      } catch (e) {
+        showToast('שגיאה בטעינת הגדרות: ' + e.message, 'error');
+      }
+    }
+
+    async function saveSettings(e) {
+      e.preventDefault();
+      const data = {};
+      for (const [key, elId] of Object.entries(SETTINGS_MAP)) {
+        const el = document.getElementById(elId);
+        if (!el) continue;
+        if (el.type === 'checkbox') {
+          data[key] = el.checked ? 'true' : 'false';
+        } else {
+          data[key] = el.value;
+        }
+      }
+      try {
+        await api('/settings', { method: 'PUT', body: JSON.stringify(data) });
+        showToast('הגדרות נשמרו בהצלחה', 'success');
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', loadSettings);
+  </script>
+</body>
+</html>

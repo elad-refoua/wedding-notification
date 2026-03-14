@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ניהול חתונה — בית</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <nav>
+    <span class="brand">💍 ניהול חתונה</span>
+    <a href="index.html">בית</a>
+    <a href="guests.html">אורחים</a>
+    <a href="messages.html">הודעות</a>
+    <a href="reminders.html">תזכורות</a>
+    <a href="settings.html">הגדרות</a>
+    <a href="export.html">ייצוא</a>
+  </nav>
+
+  <div class="container">
+    <h1 class="page-title">סטטוס אורחים</h1>
+
+    <!-- Stats Cards -->
+    <div class="stats-grid" id="statsGrid">
+      <div class="stat-card coming">
+        <div class="stat-value" id="statComing">—</div>
+        <div class="stat-label">מגיעים</div>
+      </div>
+      <div class="stat-card not-coming">
+        <div class="stat-value" id="statNotComing">—</div>
+        <div class="stat-label">לא מגיעים</div>
+      </div>
+      <div class="stat-card undecided">
+        <div class="stat-value" id="statUndecided">—</div>
+        <div class="stat-label">מתלבטים</div>
+      </div>
+      <div class="stat-card pending">
+        <div class="stat-value" id="statPending">—</div>
+        <div class="stat-label">ממתינים</div>
+      </div>
+      <div class="stat-card total">
+        <div class="stat-value" id="statTotal">—</div>
+        <div class="stat-label">סה"כ נפשות</div>
+      </div>
+    </div>
+
+    <!-- Progress Bar -->
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>התקדמות אישורים</span>
+        <span id="progressText">0 / 400</span>
+      </div>
+      <div class="progress-bar">
+        <div class="fill" id="progressFill" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Recent Activity -->
+    <div class="card">
+      <h2 style="font-size:1.1rem; margin-bottom:1rem;">פעילות אחרונה</h2>
+      <div id="activityFeed">
+        <div class="empty-state"><span class="spinner"></span> טוען...</div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+  <script>
+    // NOTE: All dynamic content is sanitized via escapeHtml() before DOM insertion.
+    // This is a local admin dashboard behind auth middleware, not a public-facing page.
+    const GOAL = 400;
+
+    async function loadStats() {
+      try {
+        const s = await api('/stats');
+        document.getElementById('statComing').textContent = s.total_people || 0;
+        document.getElementById('statNotComing').textContent = s.not_coming || 0;
+        document.getElementById('statUndecided').textContent = s.undecided || 0;
+        document.getElementById('statPending').textContent = s.pending || 0;
+        document.getElementById('statTotal').textContent = s.total_people || 0;
+
+        const pct = Math.min(100, Math.round(((s.total_people || 0) / GOAL) * 100));
+        document.getElementById('progressFill').style.width = pct + '%';
+        document.getElementById('progressText').textContent = (s.total_people || 0) + ' / ' + GOAL;
+      } catch (e) {
+        showToast('שגיאה בטעינת סטטיסטיקות: ' + e.message, 'error');
+      }
+    }
+
+    async function loadActivity() {
+      try {
+        const msgs = await api('/messages?limit=20');
+        const feed = document.getElementById('activityFeed');
+        if (!msgs.length) {
+          feed.textContent = '';
+          const empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'אין פעילות עדיין';
+          feed.appendChild(empty);
+          return;
+        }
+        // Build feed items using safe DOM methods
+        feed.textContent = '';
+        msgs.forEach(function(m) {
+          var item = document.createElement('div');
+          item.className = 'feed-item';
+
+          var time = document.createElement('span');
+          time.className = 'feed-time';
+          time.textContent = formatDate(m.created_at);
+          item.appendChild(time);
+
+          var text = document.createElement('span');
+          text.className = 'feed-text';
+
+          var strong = document.createElement('strong');
+          strong.textContent = m.guest_name || 'לא ידוע';
+          text.appendChild(strong);
+
+          var arrow = document.createTextNode(' ' + (m.direction === 'outgoing' ? '←' : '→') + ' ');
+          text.appendChild(arrow);
+
+          var body = m.body || '';
+          var bodyText = document.createTextNode(body.length > 80 ? body.substring(0, 80) + '...' : body);
+          text.appendChild(bodyText);
+
+          item.appendChild(text);
+          feed.appendChild(item);
+        });
+      } catch (e) {
+        var feed = document.getElementById('activityFeed');
+        feed.textContent = '';
+        var empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.textContent = 'שגיאה בטעינת פעילות';
+        feed.appendChild(empty);
+      }
+    }
+
+    async function refresh() {
+      await Promise.all([loadStats(), loadActivity()]);
+    }
+
+    document.addEventListener('DOMContentLoaded', function() {
+      refresh();
+      setInterval(refresh, 30000);
+    });
+  </script>
+</body>
+</html>
