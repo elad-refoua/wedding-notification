@@ -25,6 +25,16 @@ describe('Hebrew reply parser', () => {
   it('parses "stop" as opted_out', () => assert.strictEqual(parseReply('stop').status, 'opted_out'));
   it('parses "חידוש" as re_enable', () => assert.strictEqual(parseReply('חידוש').status, 're_enable'));
   it('returns null for "מה השעה?"', () => assert.strictEqual(parseReply('מה השעה?').status, null));
+  it('extracts Hebrew word number from "נגיע שלושה"', () => {
+    const r = parseReply('נגיע שלושה');
+    assert.strictEqual(r.status, 'coming');
+    assert.strictEqual(r.numComing, 3);
+  });
+  it('extracts Hebrew word number from "מגיעים שניים"', () => {
+    const r = parseReply('מגיעים שניים');
+    assert.strictEqual(r.status, 'coming');
+    assert.strictEqual(r.numComing, 2);
+  });
 });
 
 describe('Level 3 Claude API fallback', () => {

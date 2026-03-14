@@ -4,6 +4,9 @@ const { getDb, getSetting } = require('../db/db');
 let _client = null;
 function getClient() {
   if (!_client) {
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      throw new Error('Missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN environment variables');
+    }
     _client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
   }
   return _client;

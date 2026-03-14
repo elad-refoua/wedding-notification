@@ -20,6 +20,18 @@ for (const key of Object.keys(PHRASES)) {
   PHRASES[key].sort((a, b) => b.length - a.length);
 }
 
+const HEBREW_NUMBERS = {
+  'שניים': 2, 'שתיים': 2, 'שנינו': 2,
+  'שלושה': 3, 'שלוש': 3,
+  'ארבעה': 4, 'ארבע': 4,
+  'חמישה': 5, 'חמש': 5,
+  'שישה': 6, 'שש': 6,
+  'שבעה': 7, 'שבע': 7,
+  'שמונה': 8,
+  'תשעה': 9, 'תשע': 9,
+  'עשרה': 10, 'עשר': 10
+};
+
 const NUM_PATTERNS = [
   /(נבוא|נגיע|מגיעים|אנחנו)\s*(\d+)/,
   /(\d+)\s*(אנשים|נפשות|מגיעים)?/
@@ -39,13 +51,18 @@ function parseReply(text) {
     if (status) break;
   }
 
-  // Level 2: Number extraction
+  // Level 2: Number extraction (digits first, then Hebrew words)
   let numComing = null;
   for (const pattern of NUM_PATTERNS) {
     const match = text.match(pattern);
     if (match) {
       const num = parseInt(match[1]) || parseInt(match[2]);
       if (num && num > 0 && num <= 50) { numComing = num; break; }
+    }
+  }
+  if (!numComing) {
+    for (const [word, val] of Object.entries(HEBREW_NUMBERS)) {
+      if (cleaned.includes(word)) { numComing = val; break; }
     }
   }
 
