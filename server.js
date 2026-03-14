@@ -42,6 +42,9 @@ app.get('/health', (req, res) => {
 // Initialize DB on startup
 getDb();
 
+const { startScheduledJobs } = require('./src/services/reminder');
+startScheduledJobs();
+
 app.listen(PORT, () => {
   console.log('Wedding server running on port ' + PORT);
 });
