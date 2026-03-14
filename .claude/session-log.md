@@ -493,3 +493,5 @@ content = open('/tmp/gemin
 - 00:03 Run: ls -la ~/cloudflared/ 2>/dev/null; ls -la ~/.cloud
 - 00:05 Run: "/c/Program Files (x86)/cloudflared/cloudflared.ex
 - 00:09 Run: sleep 5
+- 00:12 Read: b63613212.output
+- 00:12 Run: ls -la /c/Users/user/Downloads/cert.pem 2>/dev/nul
