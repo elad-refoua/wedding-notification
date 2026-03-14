@@ -1,6 +1,6 @@
-const { describe, it } = require('node:test');
+const { describe, it, beforeEach, afterEach, mock } = require('node:test');
 const assert = require('node:assert');
-const { parseReply } = require('../src/services/parser');
+const { parseReply, parseReplyWithAI } = require('../src/services/parser');
 
 describe('Hebrew reply parser', () => {
   it('parses "כן" as coming', () => assert.strictEqual(parseReply('כן').status, 'coming'));
@@ -41,5 +41,27 @@ describe('Ambiguous messages', () => {
   it('returns null status for ambiguous messages (escalated to admins)', () => {
     const result = parseReply('צריך לראות מה המצב עם הסידורים');
     assert.strictEqual(result.status, null);
+  });
+});
+
+describe('parseReplyWithAI', () => {
+  it('returns keyword result without calling Gemini when Level 1 matches', async () => {
+    const result = await parseReplyWithAI('מגיעים');
+    assert.strictEqual(result.status, 'coming');
+  });
+
+  it('returns keyword result for "לא נגיע" without Gemini', async () => {
+    const result = await parseReplyWithAI('לא נגיע');
+    assert.strictEqual(result.status, 'not_coming');
+  });
+
+  it('returns null when no API key configured and keywords miss', async () => {
+    // No GEMINI_API_KEY in env, no DB key → Gemini returns null → escalate
+    const origKey = process.env.GEMINI_API_KEY;
+    delete process.env.GEMINI_API_KEY;
+    const result = await parseReplyWithAI('נשמח אם הילדים יהיו בריאים');
+    assert.strictEqual(result.status, null);
+    assert.strictEqual(result.numComing, null);
+    if (origKey !== undefined) process.env.GEMINI_API_KEY = origKey;
   });
 });

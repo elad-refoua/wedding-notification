@@ -3,7 +3,7 @@ const router = express.Router();
 const { getDb, getSetting, setSetting } = require('../db/db');
 const { normalizePhone } = require('../utils/phone');
 const { sendSms, sendWhatsApp, sendToAdmins, validateTwilioSignature } = require('../services/twilio');
-const { parseReply } = require('../services/parser');
+const { parseReplyWithAI } = require('../services/parser');
 const { executeAdminCommand } = require('../services/admin');
 
 // Twilio signature validation middleware (skip in dev)
@@ -59,8 +59,8 @@ async function handleIncoming(req, res, channel) {
     return twimlResponse(res);
   }
 
-  // Known guest — parse RSVP reply
-  const result = parseReply(body);
+  // Known guest — parse RSVP reply (Level 1-2 keywords, Level 3 Gemini AI)
+  const result = await parseReplyWithAI(body);
 
   // Unrecognized reply — escalate to admins
   if (!result.status) {

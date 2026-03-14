@@ -69,4 +69,18 @@ function parseReply(text) {
   return { status, numComing };
 }
 
-module.exports = { parseReply };
+async function parseReplyWithAI(text) {
+  const result = parseReply(text);
+  if (result.status !== null) return result;
+
+  // Level 3: Gemini (only when keywords didn't match)
+  const { classifyWithGemini } = require('./gemini');
+  const aiResult = await classifyWithGemini(text);
+  if (aiResult && aiResult.confidence >= 0.7) {
+    return { status: aiResult.status, numComing: aiResult.numComing };
+  }
+
+  return { status: null, numComing: null };
+}
+
+module.exports = { parseReply, parseReplyWithAI };

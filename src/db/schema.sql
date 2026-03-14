@@ -56,4 +56,7 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('whatsapp_enabled', 'false'),
   ('admin_phones', ''),
   ('milestone_thresholds', '50,100,150,200,250,300,350'),
-  ('milestones_sent', '');
+  ('milestones_sent', ''),
+  ('gemini_daily_limit', '50'),
+  ('gemini_calls_today', '0'),
+  ('gemini_calls_date', '');

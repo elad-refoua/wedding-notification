@@ -69,6 +69,18 @@
           <small class="field-help" style="margin-right:auto;">כשמסומן, הודעות נשלחות בוואטסאפ. כשלא — ב-SMS בלבד.</small>
         </div>
 
+        <!-- Gemini AI -->
+        <div class="form-group full-width">
+          <label>מפתח Gemini API</label>
+          <small class="field-help">מפתח API של Google AI Studio לסיווג אוטומטי של תשובות מוזמנים שלא ניתן לפענח אוטומטית. ניתן להשיג בחינם ב-aistudio.google.com.</small>
+          <input type="password" id="sGeminiKey" dir="ltr" placeholder="AIza...">
+        </div>
+        <div class="form-group">
+          <label>מגבלת קריאות יומית ל-Gemini</label>
+          <small class="field-help">כמה פעמים ביום המערכת תפנה ל-AI לעזרה בפיענוח תשובות. ברוב המקרים מספיק 50. מתאפס כל יום.</small>
+          <input type="number" id="sGeminiDailyLimit" min="1" value="50">
+        </div>
+
         <!-- Admin -->
         <div class="form-group full-width">
           <label>טלפוני מנהלים (מופרד בפסיק)</label>
@@ -99,6 +111,8 @@
       batch_size: 'sBatchSize',
       batch_delay_seconds: 'sBatchDelay',
       whatsapp_enabled: 'sWhatsappEnabled',
+      gemini_api_key: 'sGeminiKey',
+      gemini_daily_limit: 'sGeminiDailyLimit',
       admin_phones: 'sAdminPhones',
       milestone_thresholds: 'sMilestones'
     };
@@ -131,6 +145,10 @@
         } else {
           data[key] = el.value;
         }
+      }
+      // Don't overwrite masked API key
+      if (data.gemini_api_key && data.gemini_api_key.startsWith('****')) {
+        delete data.gemini_api_key;
       }
       try {
         await api('/settings', { method: 'PUT', body: JSON.stringify(data) });

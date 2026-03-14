@@ -115,12 +115,19 @@ router.get('/settings', (req, res) => {
   const rows = getDb().prepare('SELECT * FROM settings').all();
   const obj = {};
   for (const row of rows) obj[row.key] = row.value;
+  // Mask sensitive keys
+  if (obj.gemini_api_key) {
+    const key = obj.gemini_api_key;
+    obj.gemini_api_key = '****...' + key.slice(-4);
+  }
   res.json(obj);
 });
 
 // PUT /api/settings
 router.put('/settings', (req, res) => {
   for (const [key, value] of Object.entries(req.body)) {
+    // Don't overwrite real API key with masked value
+    if (key === 'gemini_api_key' && value.startsWith('****')) continue;
     setSetting(key, value);
   }
   res.json({ updated: true });
