@@ -476,3 +476,7 @@ content = open('/tmp/gemin
 - 23:42 Create: project_gemini_integration.md
 - 23:42 Read: MEMORY.md
 - 23:42 Edit: MEMORY.md
+- 23:44 Run: cat /c/Users/user/.google_api_keys 2>/dev/null
+- 23:44 Edit: .env
+- 23:45 Run: taskkill.exe //F //IM node.exe 2>/dev/null; sleep 
+- 23:45 Run: cd "/c/Users/user/Desktop/projects/wedding notific
