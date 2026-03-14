@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 const router = express.Router();
 const { getDb, getSetting, setSetting } = require('../db/db');
 const { normalizePhone } = require('../utils/phone');
@@ -129,7 +130,12 @@ router.put('/settings', (req, res) => {
 router.post('/import', async (req, res) => {
   try {
     const { importExcel } = require('../services/importer');
-    const result = importExcel(req.body.filePath);
+    const filePath = req.body.filePath;
+    if (!filePath) return res.status(400).json({ error: 'filePath required' });
+    const resolved = path.resolve(filePath);
+    const allowedDir = path.resolve(__dirname, '..', '..');
+    if (!resolved.startsWith(allowedDir)) return res.status(400).json({ error: 'Path outside project directory' });
+    const result = importExcel(resolved);
     res.json(result);
   } catch (e) {
     res.status(500).json({ error: e.message || 'Import module not available yet' });

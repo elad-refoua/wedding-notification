@@ -308,3 +308,26 @@
 - 22:22 Run: which cloudflared 2>/dev/null
 - 22:22 Run: winget list Cloudflare.cloudflared 2>/dev/null
 - 22:23 Run: winget install Cloudflare.cloudflared --accept-pac
+- 22:24 Read: settings.html
+- 22:24 Read: index.html
+- 22:24 Read: messages.html
+- 22:24 Read: reminders.html
+- 22:24 Read: guests.html
+- 22:24 Edit: settings.html
+- 22:24 Edit: index.html
+- 22:24 Edit: messages.html
+- 22:24 Edit: reminders.html
+- 22:24 Edit: guests.html
+- 22:24 Read: server.js
+- 22:24 Edit: server.js
+- 22:25 Read: reminder.js
+- 22:25 Edit: reminder.js
+- 22:25 Read: api.js
+- 22:25 Edit: api.js
+- 22:25 Read: api.js
+- 22:25 Edit: api.js
+- 22:25 Read: webhooks.js
+- 22:25 Edit: webhooks.js
+- 22:25 Edit: webhooks.js
+- 22:26 Edit: .gitignore
+- 22:26 Run: cd "C:\Users\user\Desktop\projects\wedding notific

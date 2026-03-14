@@ -120,7 +120,7 @@
           var arrow = document.createTextNode(' ' + (m.direction === 'outgoing' ? '←' : '→') + ' ');
           text.appendChild(arrow);
 
-          var body = m.body || '';
+          var body = m.content || '';
           var bodyText = document.createTextNode(body.length > 80 ? body.substring(0, 80) + '...' : body);
           text.appendChild(bodyText);
 

@@ -18,10 +18,10 @@ function authMiddleware(req, res, next) {
   }
   const token = req.headers.authorization?.replace('Bearer ', '');
   const expected = process.env.DASHBOARD_TOKEN;
-  if (token && expected && token.length === expected.length) {
+  if (token && expected) {
     const a = Buffer.from(token, 'utf8');
     const b = Buffer.from(expected, 'utf8');
-    if (crypto.timingSafeEqual(a, b)) {
+    if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
       return next();
     }
   }

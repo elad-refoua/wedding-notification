@@ -5,8 +5,9 @@ const fs = require('fs');
 // === WithDb variants (for testing with in-memory DB) ===
 
 function createFirstReminderWithDb(guestId, db) {
-  const intervalDays = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'reminder_interval_days'").get()?.value || '5');
-  const maxReminders = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'max_reminders'").get()?.value || '10');
+  const intervalDays = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'reminder_interval_days'").get()?.value) || 5;
+  if (!Number.isFinite(intervalDays) || intervalDays < 1) return;
+  const maxReminders = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'max_reminders'").get()?.value) || 10;
 
   const sentCount = db.prepare("SELECT COUNT(*) as c FROM reminders WHERE guest_id = ? AND status IN ('sent', 'pending')").get(guestId).c;
   if (sentCount >= maxReminders) return;

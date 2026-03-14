@@ -124,7 +124,7 @@ function checkMilestone(db) {
 }
 
 // SMS webhooks
-router.post('/sms', twilioAuth, (req, res) => handleIncoming(req, res, 'sms'));
+router.post('/sms', twilioAuth, (req, res) => { return handleIncoming(req, res, 'sms'); });
 router.post('/sms/status', twilioAuth, (req, res) => {
   const db = getDb();
   const sid = req.body.MessageSid;
@@ -136,7 +136,7 @@ router.post('/sms/status', twilioAuth, (req, res) => {
 });
 
 // WhatsApp webhooks
-router.post('/whatsapp', twilioAuth, (req, res) => handleIncoming(req, res, 'whatsapp'));
+router.post('/whatsapp', twilioAuth, (req, res) => { return handleIncoming(req, res, 'whatsapp'); });
 router.post('/whatsapp/status', twilioAuth, (req, res) => {
   const db = getDb();
   const sid = req.body.MessageSid;
