@@ -90,7 +90,35 @@ async function executeAdminCommand(text, db) {
       if (cmd.group) { sql += ' AND group_name LIKE ?'; params.push('%' + cmd.group + '%'); }
       const guests = db.prepare(sql).all(...params);
       if (!guests.length) return 'אין אורחים ממתינים לשליחה';
-      return 'מתחיל שליחה ל-' + guests.length + ' אורחים...';
+
+      // Actually send invitations in background
+      const template = getSetting('invitation_template') || 'שלום {{name}}, אתם מוזמנים לחתונה של נתנאל ועמית!';
+      const batchSize = parseInt(getSetting('batch_size') || '10');
+      const batchDelay = parseInt(getSetting('batch_delay_seconds') || '60') * 1000;
+      const { sendToGuest, sendToAdmins } = require('./twilio');
+      const { createFirstReminder } = require('./reminder');
+
+      (async () => {
+        let sent = 0;
+        for (let i = 0; i < guests.length; i++) {
+          const g = guests[i];
+          const body = template.replace(/\{\{name\}\}/g, g.name);
+          try {
+            await sendToGuest(g, body);
+            db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
+            createFirstReminder(g.id);
+            sent++;
+          } catch (err) {
+            console.error('Send failed for ' + g.name + ':', err.message);
+          }
+          if ((i + 1) % batchSize === 0 && i < guests.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, batchDelay));
+          }
+        }
+        await sendToAdmins('שליחה הושלמה: ' + sent + '/' + guests.length + ' הזמנות נשלחו');
+      })().catch(err => console.error('Bulk send failed:', err));
+
+      return 'מתחיל שליחה ל-' + guests.length + ' אורחים... תקבלו עדכון בסיום.';
     }
     case 'add_guest': {
       const phone = normalizePhone(cmd.phone);

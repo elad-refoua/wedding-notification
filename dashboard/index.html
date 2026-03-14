@@ -15,6 +15,8 @@
     <a href="reminders.html">תזכורות</a>
     <a href="settings.html">הגדרות</a>
     <a href="export.html">ייצוא</a>
+    <a href="guide.html">מדריך</a>
+    <a href="#" onclick="sessionStorage.removeItem('dashToken');location.href='/dashboard/login.html'" style="margin-right:auto">יציאה</a>
   </nav>
 
   <div class="container">
@@ -55,6 +57,17 @@
       </div>
     </div>
 
+    <!-- Send Invitations -->
+    <div class="card" id="sendCard" style="display:none;">
+      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
+        <div>
+          <h2 style="font-size:1.1rem; margin:0;">שליחת הזמנות</h2>
+          <p style="color:#94a3b8; margin:0.25rem 0 0; font-size:0.85rem;" id="pendingInfo"></p>
+        </div>
+        <button class="btn btn-primary" onclick="sendInvitations()" id="sendBtn">שלח הזמנות לממתינים</button>
+      </div>
+    </div>
+
     <!-- Recent Activity -->
     <div class="card">
       <h2 style="font-size:1.1rem; margin-bottom:1rem;">פעילות אחרונה</h2>
@@ -82,8 +95,35 @@
         const pct = Math.min(100, Math.round(((s.total_people || 0) / GOAL) * 100));
         document.getElementById('progressFill').style.width = pct + '%';
         document.getElementById('progressText').textContent = (s.total_people || 0) + ' / ' + GOAL;
+
+        // Show send card if there are pending guests
+        const sendCard = document.getElementById('sendCard');
+        if (s.pending > 0) {
+          sendCard.style.display = 'block';
+          document.getElementById('pendingInfo').textContent = s.pending + ' אורחים ממתינים לשליחת הזמנה';
+        } else {
+          sendCard.style.display = 'none';
+        }
       } catch (e) {
         showToast('שגיאה בטעינת סטטיסטיקות: ' + e.message, 'error');
+      }
+    }
+
+    async function sendInvitations() {
+      var btn = document.getElementById('sendBtn');
+      var pending = document.getElementById('statPending').textContent;
+      if (!confirm('לשלוח הזמנות ל-' + pending + ' אורחים ממתינים?')) return;
+      btn.disabled = true;
+      btn.textContent = 'שולח...';
+      try {
+        var result = await api('/send-invitations', { method: 'POST', body: JSON.stringify({}) });
+        showToast(result.message || 'שליחה החלה', 'success');
+        setTimeout(refresh, 3000);
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'שלח הזמנות לממתינים';
       }
     }
 

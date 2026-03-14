@@ -133,6 +133,51 @@ router.put('/settings', (req, res) => {
   res.json({ updated: true });
 });
 
+// POST /api/send-invitations — send invitations to pending guests
+router.post('/send-invitations', async (req, res) => {
+  try {
+    const db = getDb();
+    const { sendToGuest } = require('../services/twilio');
+    const { createFirstReminder } = require('../services/reminder');
+    const template = getSetting('invitation_template') || 'שלום {{name}}, אתם מוזמנים לחתונה של נתנאל ועמית!';
+    const batchSize = parseInt(getSetting('batch_size') || '10');
+    const batchDelay = parseInt(getSetting('batch_delay_seconds') || '60') * 1000;
+
+    let sql = "SELECT * FROM guests WHERE status = 'pending'";
+    const params = [];
+    if (req.body.group) { sql += ' AND group_name LIKE ?'; params.push('%' + req.body.group + '%'); }
+    const guests = db.prepare(sql).all(...params);
+
+    if (!guests.length) return res.json({ sent: 0, total: 0, message: 'אין אורחים ממתינים' });
+
+    // Send in background, return immediately
+    const total = guests.length;
+    (async () => {
+      let sent = 0;
+      for (let i = 0; i < guests.length; i++) {
+        const g = guests[i];
+        const body = template.replace(/\{\{name\}\}/g, g.name);
+        try {
+          await sendToGuest(g, body);
+          db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
+          createFirstReminder(g.id);
+          sent++;
+        } catch (err) {
+          console.error('Send invitation failed for ' + g.name + ':', err.message);
+        }
+        if ((i + 1) % batchSize === 0 && i < guests.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, batchDelay));
+        }
+      }
+      console.log('Bulk send complete: ' + sent + '/' + total);
+    })().catch(err => console.error('Bulk send failed:', err));
+
+    res.json({ sent: 0, total, message: 'מתחיל שליחה ל-' + total + ' אורחים...' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 // POST /api/import
 router.post('/import', async (req, res) => {
   try {

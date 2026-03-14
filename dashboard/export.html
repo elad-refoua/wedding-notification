@@ -15,6 +15,8 @@
     <a href="reminders.html">תזכורות</a>
     <a href="settings.html">הגדרות</a>
     <a href="export.html">ייצוא</a>
+    <a href="guide.html">מדריך</a>
+    <a href="#" onclick="sessionStorage.removeItem('dashToken');location.href='/dashboard/login.html'" style="margin-right:auto">יציאה</a>
   </nav>
 
   <div class="container">
@@ -132,11 +134,26 @@
       }
     }
 
-    function downloadExcel() {
+    async function downloadExcel() {
       var status = document.getElementById('exportStatus').value;
       var params = new URLSearchParams();
       if (status) params.set('status', status);
-      window.location.href = '/api/export?' + params.toString();
+      try {
+        var token = getToken();
+        var res = await fetch('/api/export?' + params.toString(), {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (!res.ok) throw new Error('Export failed');
+        var blob = await res.blob();
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'guests-' + new Date().toISOString().split('T')[0] + '.xlsx';
+        a.click();
+        URL.revokeObjectURL(url);
+      } catch (e) {
+        showToast('שגיאה בייצוא: ' + e.message, 'error');
+      }
     }
 
     document.getElementById('exportStatus').addEventListener('change', loadPreview);

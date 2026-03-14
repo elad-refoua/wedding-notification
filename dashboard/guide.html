@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ניהול חתונה — מדריך</title>
+  <link rel="stylesheet" href="css/style.css">
+  <style>
+    .guide-section { margin-bottom: 2rem; }
+    .guide-section h2 { color: #0ea5e9; font-size: 1.3rem; margin-bottom: 0.75rem; border-bottom: 1px solid #475569; padding-bottom: 0.5rem; }
+    .guide-section h3 { color: #e2e8f0; font-size: 1.05rem; margin: 1rem 0 0.5rem; }
+    .guide-section p, .guide-section li { color: #cbd5e1; line-height: 1.7; }
+    .guide-section ul, .guide-section ol { padding-right: 1.5rem; margin: 0.5rem 0; }
+    .guide-section li { margin-bottom: 0.3rem; }
+    .guide-table { width: 100%; border-collapse: collapse; margin: 0.75rem 0; }
+    .guide-table th, .guide-table td { border: 1px solid #475569; padding: 0.5rem 0.75rem; text-align: right; }
+    .guide-table th { background: #1e293b; color: #0ea5e9; font-weight: 600; }
+    .guide-table td { color: #cbd5e1; }
+    .step-box { background: #1e293b; border-radius: 8px; padding: 1rem 1.25rem; margin: 0.75rem 0; border-right: 3px solid #0ea5e9; }
+    .step-box .step-num { color: #0ea5e9; font-weight: bold; font-size: 1.1rem; }
+    .step-box p { margin: 0.25rem 0 0; }
+    .cmd-box { background: #0f172a; border-radius: 6px; padding: 0.5rem 0.75rem; margin: 0.3rem 0; font-family: monospace; direction: rtl; color: #a5f3fc; display: inline-block; }
+    .highlight { color: #fbbf24; font-weight: 600; }
+    .faq-q { color: #e2e8f0; font-weight: 600; margin-top: 1rem; }
+    .faq-a { color: #94a3b8; margin: 0.25rem 0 0.75rem; }
+  </style>
+</head>
+<body>
+  <nav>
+    <span class="brand">💍 ניהול חתונה</span>
+    <a href="index.html">בית</a>
+    <a href="guests.html">אורחים</a>
+    <a href="messages.html">הודעות</a>
+    <a href="reminders.html">תזכורות</a>
+    <a href="settings.html">הגדרות</a>
+    <a href="export.html">ייצוא</a>
+    <a href="guide.html">מדריך</a>
+    <a href="#" onclick="sessionStorage.removeItem('dashToken');location.href='/dashboard/login.html'" style="margin-right:auto">יציאה</a>
+  </nav>
+
+  <div class="container">
+    <h1 class="page-title">מדריך שימוש</h1>
+
+    <!-- Overview -->
+    <div class="card guide-section">
+      <h2>מה זה?</h2>
+      <p>מערכת אוטומטית לניהול הזמנות לחתונה של <span class="highlight">נתנאל ועמית (30.8.2026)</span>. המערכת שולחת הזמנות בוואטסאפ/SMS, מקבלת תשובות אוטומטית, מנהלת תזכורות, ונותנת תמונת מצב מלאה — כל מה שצריך כדי לדעת מי מגיע.</p>
+    </div>
+
+    <!-- Quick Start -->
+    <div class="card guide-section">
+      <h2>התחלה מהירה — 3 צעדים</h2>
+
+      <div class="step-box">
+        <span class="step-num">1. העלאת רשימת אורחים</span>
+        <p>הכינו קובץ אקסל עם רשימת המוזמנים (ראו פורמט למטה) והעלו אותו דרך עמוד <a href="guests.html" style="color:#0ea5e9">אורחים</a>.</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-num">2. שליחת הזמנות</span>
+        <p>בעמוד <a href="index.html" style="color:#0ea5e9">בית</a>, לחצו על כפתור <span class="highlight">"שלח הזמנות לממתינים"</span>. המערכת תשלח לכל מי שטרם קיבל הזמנה.</p>
+      </div>
+
+      <div class="step-box">
+        <span class="step-num">3. המתנה לתשובות</span>
+        <p>האורחים עונים בהודעה חוזרת. המערכת מזהה אוטומטית "מגיעים" / "לא מגיעים" ומעדכנת. מי שלא ענה — יקבל תזכורת אוטומטית.</p>
+      </div>
+    </div>
+
+    <!-- Excel Format -->
+    <div class="card guide-section">
+      <h2>פורמט קובץ אקסל</h2>
+      <p>הכינו קובץ <code>.xlsx</code> עם העמודות הבאות (בשורה הראשונה — כותרות בעברית):</p>
+
+      <table class="guide-table">
+        <thead>
+          <tr>
+            <th>עמודה</th>
+            <th>חובה?</th>
+            <th>הסבר</th>
+            <th>דוגמה</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="highlight">שם</td><td>כן</td><td>שם האורח/ת או המשפחה</td><td>משפחת כהן</td></tr>
+          <tr><td class="highlight">טלפון</td><td>כן</td><td>מספר נייד ישראלי</td><td>0521234567</td></tr>
+          <tr><td>צד</td><td>לא</td><td>חתן / כלה</td><td>חתן</td></tr>
+          <tr><td>קבוצה</td><td>לא</td><td>קבוצת אורחים (משפחה, עבודה, חברים...)</td><td>חברים מהצבא</td></tr>
+          <tr><td>מוזמנים</td><td>לא</td><td>כמה אנשים כלולים בהזמנה (ברירת מחדל: 1)</td><td>4</td></tr>
+          <tr><td>הערות</td><td>לא</td><td>הערות חופשיות</td><td>צמחוני</td></tr>
+        </tbody>
+      </table>
+      <p style="color:#94a3b8; font-size:0.85rem; margin-top:0.5rem;">* הטלפון מנורמל אוטומטית — תקין גם 052-1234567, 0521234567, 972521234567 או +972521234567</p>
+    </div>
+
+    <!-- How It Works -->
+    <div class="card guide-section">
+      <h2>איך המערכת עובדת?</h2>
+
+      <h3>שליחת הזמנה ראשונה</h3>
+      <p>כשלוחצים "שלח הזמנות" (או שולחים <span class="cmd-box">שלח לכולם</span> בוואטסאפ), המערכת שולחת לכל אורח בסטטוס "ממתין" את תבנית ההזמנה, מעדכנת אותו ל"הוזמן", ומתזמנת תזכורת ראשונה.</p>
+
+      <h3>זיהוי תשובות (3 שלבים)</h3>
+      <ol>
+        <li><span class="highlight">שלב 1 — מילות מפתח:</span> המערכת מזהה מילים כמו "מגיעים", "לא מגיעים", "אולי", "כן", "נגיע" וכו'. זיהוי מיידי ומדויק.</li>
+        <li><span class="highlight">שלב 2 — מספר מגיעים:</span> אם כתוב "נגיע 4" או "מגיעים שלושה" — המערכת שומרת את המספר.</li>
+        <li><span class="highlight">שלב 3 — AI (Gemini):</span> אם לא הצליחה לזהות בשלב 1, המערכת שולחת את ההודעה ל-AI שמנסה לסווג. אם גם ה-AI לא בטוח — ההודעה עוברת למנהלים לטיפול ידני.</li>
+      </ol>
+
+      <h3>תזכורות אוטומטיות</h3>
+      <p>מי שקיבל הזמנה ולא ענה — מקבל תזכורת אוטומטית כל מספר ימים (ברירת מחדל: 5). אפשר לשנות את התדירות והמקסימום בעמוד <a href="settings.html" style="color:#0ea5e9">הגדרות</a>.</p>
+      <ul>
+        <li>תזכורות נשלחות רק למי שבסטטוס "הוזמן" או "מתלבט"</li>
+        <li>ברגע שאורח עונה "מגיעים" או "לא מגיעים" — התזכורות נעצרות אוטומטית</li>
+        <li>אפשר לעצור תזכורות ידנית לאורח ספציפי</li>
+      </ul>
+
+      <h3>דוח יומי</h3>
+      <p>המערכת שולחת דוח סיכום יומי למנהלים (ברירת מחדל: 20:00) עם מספרי מגיעים, לא מגיעים, ממתינים.</p>
+    </div>
+
+    <!-- Admin Commands -->
+    <div class="card guide-section">
+      <h2>פקודות מנהל בוואטסאפ</h2>
+      <p>מנהלים (מספרים שמוגדרים בהגדרות) יכולים לשלוח פקודות ישירות בוואטסאפ:</p>
+
+      <table class="guide-table">
+        <thead>
+          <tr>
+            <th>פקודה</th>
+            <th>מה עושה</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td class="cmd-box">סטטוס</td><td>מקבלים סיכום מספרים — מגיעים, לא, מתלבטים, ממתינים</td></tr>
+          <tr><td class="cmd-box">שלח לכולם</td><td>שולח הזמנות לכל מי שבסטטוס "ממתין"</td></tr>
+          <tr><td class="cmd-box">שלח לחברים</td><td>שולח הזמנות רק לקבוצת "חברים"</td></tr>
+          <tr><td class="cmd-box">הוסף דני 0521234567 חתן חברים</td><td>מוסיף אורח חדש</td></tr>
+          <tr><td class="cmd-box">עדכן דני מגיע 3</td><td>מעדכן ידנית: דני מגיע עם 3 אנשים</td></tr>
+          <tr><td class="cmd-box">עצור תזכורות לדני</td><td>מפסיק תזכורות לאורח ספציפי</td></tr>
+          <tr><td class="cmd-box">תזכורות כל 3 ימים</td><td>משנה תדירות תזכורות</td></tr>
+          <tr><td class="cmd-box">דוח יומי ב-21:00</td><td>משנה שעת דוח יומי</td></tr>
+          <tr><td class="cmd-box">עזרה</td><td>רשימת כל הפקודות</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Dashboard Pages -->
+    <div class="card guide-section">
+      <h2>עמודי הדשבורד</h2>
+      <table class="guide-table">
+        <thead>
+          <tr>
+            <th>עמוד</th>
+            <th>מה מציג</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><a href="index.html" style="color:#0ea5e9">בית</a></td><td>סטטיסטיקות, פס התקדמות, כפתור שליחת הזמנות, פעילות אחרונה</td></tr>
+          <tr><td><a href="guests.html" style="color:#0ea5e9">אורחים</a></td><td>רשימת כל האורחים — סינון, חיפוש, הוספה, עריכה, מחיקה, ייבוא מאקסל</td></tr>
+          <tr><td><a href="messages.html" style="color:#0ea5e9">הודעות</a></td><td>יומן כל ההודעות שנשלחו והתקבלו</td></tr>
+          <tr><td><a href="reminders.html" style="color:#0ea5e9">תזכורות</a></td><td>רשימת תזכורות מתוכננות, נשלחות, ומבוטלות</td></tr>
+          <tr><td><a href="settings.html" style="color:#0ea5e9">הגדרות</a></td><td>תבניות הודעות, תדירות תזכורות, מספרי מנהלים, אבני דרך</td></tr>
+          <tr><td><a href="export.html" style="color:#0ea5e9">ייצוא</a></td><td>ייצוא רשימת אורחים לאקסל עם סינון לפי סטטוס</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- FAQ -->
+    <div class="card guide-section">
+      <h2>שאלות נפוצות</h2>
+
+      <p class="faq-q">איך מוסיפים אורחים?</p>
+      <p class="faq-a">שתי דרכים: (1) ייבוא קובץ אקסל דרך עמוד אורחים, (2) הוספה ידנית דרך כפתור "+ הוסף אורח" או פקודת וואטסאפ.</p>
+
+      <p class="faq-q">מה קורה אם אורח עונה משהו שהמערכת לא מבינה?</p>
+      <p class="faq-a">ההודעה נשלחת למנהלים לטיפול ידני. אפשר לעדכן את הסטטוס בעצמכם דרך הדשבורד או בפקודת "עדכן" בוואטסאפ.</p>
+
+      <p class="faq-q">מה קורה אם אורח אומר "הסר"?</p>
+      <p class="faq-a">האורח מוסר מרשימת התפוצה ולא יקבל יותר הודעות. אם ישלח "חידוש" — יחזור לרשימה.</p>
+
+      <p class="faq-q">כמה תזכורות כל אורח מקבל?</p>
+      <p class="faq-a">ברירת מחדל: עד 10 תזכורות כל 5 ימים. אפשר לשנות בהגדרות. ברגע שעונה — התזכורות נעצרות.</p>
+
+      <p class="faq-q">אפשר לשלוח רק לקבוצה מסוימת?</p>
+      <p class="faq-a">כן! בוואטסאפ: "שלח ל[שם הקבוצה]", למשל "שלח לחברים מהעבודה". המערכת תשלח רק לאורחים בקבוצה הזו.</p>
+
+      <p class="faq-q">איך האורח יודע כמה אנשים הוא יכול להביא?</p>
+      <p class="faq-a">המערכת לא מגבילה — אם אורח כותב "נגיע 6" המספר נשמר. אפשר לעדכן ידנית אם צריך.</p>
+
+      <p class="faq-q">ההודעות נשלחות בוואטסאפ או SMS?</p>
+      <p class="faq-a">כשוואטסאפ מופעל (ברירת מחדל) — נשלח בשני הערוצים במקביל. אפשר לכבות וואטסאפ בהגדרות ולשלוח רק SMS.</p>
+
+      <p class="faq-q">איך משנים את נוסח ההזמנה?</p>
+      <p class="faq-a">בעמוד הגדרות — תבנית הזמנה ותבנית תזכורת. השתמשו ב-{{name}} כדי לשתול את שם האורח.</p>
+    </div>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
