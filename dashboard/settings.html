@@ -25,50 +25,60 @@
         <!-- Templates -->
         <div class="form-group full-width">
           <label>תבנית הזמנה</label>
+          <small class="field-help">ההודעה שנשלחת למוזמנים בפעם הראשונה. השתמשו ב-{{name}} כדי לשתול את שם המוזמן.</small>
           <textarea id="sInviteTemplate" rows="4" placeholder="שלום {name}, אתם מוזמנים לחתונה שלנו!"></textarea>
         </div>
         <div class="form-group full-width">
           <label>תבנית תזכורת</label>
+          <small class="field-help">ההודעה שנשלחת למוזמנים שעדיין לא אישרו הגעה. גם כאן {{name}} ישתול את השם.</small>
           <textarea id="sReminderTemplate" rows="4" placeholder="שלום {name}, רק רצינו לוודא - האם אתם מגיעים?"></textarea>
         </div>
 
         <!-- Reminder Settings -->
         <div class="form-group">
           <label>מרווח תזכורות (ימים)</label>
+          <small class="field-help">כל כמה ימים לשלוח תזכורת למי שלא ענה.</small>
           <input type="number" id="sReminderInterval" min="1" value="3">
         </div>
         <div class="form-group">
           <label>מקסימום תזכורות</label>
+          <small class="field-help">כמה תזכורות לשלוח לפני שמפסיקים. אחרי זה לא נשלחות יותר.</small>
           <input type="number" id="sMaxReminders" min="1" value="3">
         </div>
 
         <!-- Scheduling -->
         <div class="form-group">
           <label>שעת דוח יומי</label>
+          <small class="field-help">באיזו שעה לשלוח סיכום יומי למנהלים — כמה אישרו, כמה ממתינים.</small>
           <input type="time" id="sDailyReportTime" value="09:00">
         </div>
         <div class="form-group">
           <label>גודל אצווה</label>
+          <small class="field-help">כמה הודעות לשלוח בבת אחת לפני הפסקה. מונע חסימה ע"י טוויליו.</small>
           <input type="number" id="sBatchSize" min="1" value="20">
         </div>
 
         <div class="form-group">
           <label>השהיה בין אצוות (שניות)</label>
+          <small class="field-help">כמה שניות לחכות בין אצווה לאצווה כדי לא להציף את השירות.</small>
           <input type="number" id="sBatchDelay" min="1" value="5">
         </div>
         <div class="form-group" style="display:flex; align-items:center; gap:0.75rem; padding-top:1.5rem;">
           <input type="checkbox" id="sWhatsappEnabled">
           <label for="sWhatsappEnabled" style="margin:0; color:#f1f5f9; font-size:0.95rem;">WhatsApp מופעל</label>
+          <small class="field-help" style="margin-right:auto;">כשמסומן, הודעות נשלחות בוואטסאפ. כשלא — ב-SMS בלבד.</small>
         </div>
 
         <!-- Admin -->
         <div class="form-group full-width">
           <label>טלפוני מנהלים (מופרד בפסיק)</label>
+          <small class="field-help">מספרי הטלפון שמקבלים התראות מהמערכת ויכולים לשלוח פקודות ניהול בוואטסאפ.</small>
           <input type="text" id="sAdminPhones" dir="ltr" placeholder="0501234567, 0529876543">
         </div>
         <div class="form-group full-width">
-          <label>אבני דרך (מופרד בפסיק)</label>
-          <input type="text" id="sMilestones" placeholder="100, 200, 300, 400">
+          <label>אבני דרך</label>
+          <small class="field-help">מספרי אישורים שבהם תישלח התראה חגיגית למנהלים. למשל: כשמגיעים ל-100 אישורים, 200, וכו'.</small>
+          <input type="text" id="sMilestones" placeholder="50, 100, 200, 300, 400">
         </div>
       </div>
 

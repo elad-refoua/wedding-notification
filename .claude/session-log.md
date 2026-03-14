@@ -403,3 +403,9 @@ curl -s -X POST h
 - 22:57 Run: curl -s http://localhost:3860/api/guests
 - 22:58 Run: cd "/c/Users/user/Desktop/projects/wedding notific
 - 22:58 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 22:59 Read: settings.html
+- 23:00 Edit: settings.html
+- 23:01 Read: style.css
+- 23:01 Edit: style.css
+- 23:01 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 23:01 Run: cd "/c/Users/user/Desktop/projects/wedding notific
