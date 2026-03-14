@@ -501,3 +501,11 @@ content = open('/tmp/gemin
 - 00:15 Run: cd "/c/Users/user/Desktop/projects/wedding notific
 - 00:16 Run: cd "/c/Users/user/Desktop/projects/wedding notific
 - 00:16 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 00:29 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 00:29 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 00:29 Run: gh repo edit elad-refoua/wedding-notification --vi
+- 00:31 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 00:31 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 00:36 Read: server.js
+- 00:36 Create: render.yaml
+- 00:36 Run: cd "/c/Users/user/Desktop/projects/wedding notific
