@@ -149,6 +149,9 @@ undecided ──(positive reply)──→ coming
 undecided ──(negative reply)──→ not_coming
 coming ──(changed mind)──→ not_coming
 not_coming ──(changed mind)──→ coming
+any ──(sends הסר/stop)──→ opted_out
+opted_out ──(sends חידוש)──→ invited (re-enabled, new reminder cycle starts)
+opted_out ──(admin manual override)──→ invited
 any ──(admin manual override)──→ any
 ```
 
@@ -192,12 +195,29 @@ If Claude returns UNCLEAR → escalate to admins via WhatsApp.
 5. Update guest status + num_coming
 6. If status changed to `coming` and `ask_special_requests` is on → send special request question
 
+### Special Request Reply Handling
+
+After a guest confirms `coming`, the system sends the special request question. The guest's reply is handled as follows:
+
+1. If the guest's current status is `coming` and the last outgoing message was a special request question → treat the reply as a special request answer (not an RSVP).
+2. Store the reply text as-is in `guests.special_req` (free text, no parsing needed).
+3. Reply with confirmation: "תודה, רשמנו! 🙏"
+4. If the reply contains RSVP-like content ("actually we can't come"), the keyword parser still runs first. If it detects a status change → process as RSVP (overrides special request context). If no RSVP keywords → treat as special request.
+5. A guest can update their special request by sending another message — latest reply overwrites `special_req`.
+
 ### Reminders
 
-- Hourly check for due reminders
-- For each undecided guest with reminder due → send follow-up
-- Schedule next reminder based on settings.reminder_interval_days
-- Stop when guest gives definitive answer or max_reminders reached
+**Reminder row creation:**
+- When a guest transitions to `invited` → create the first reminder row with `scheduled_at = now + reminder_interval_days`, `reminder_num = 1`, `status = 'pending'`.
+- When the hourly job sends a reminder → mark it `sent`, then create the next reminder row with `scheduled_at = now + reminder_interval_days`, `reminder_num = prev + 1` — unless `reminder_num >= max_reminders`.
+- When a guest gives a definitive answer (coming/not_coming/opted_out) → cancel all pending reminders for that guest.
+
+**Hourly job:**
+- Every hour: query reminders WHERE `status = 'pending'` AND `scheduled_at <= now`.
+- For each: send reminder message, update reminder status to `sent`, create next reminder row if under max.
+- If guest has received any outgoing message in the last 24 hours → skip this reminder cycle (delay to next hour check). This is the "no duplicate within 24 hours" rule — it applies to all outgoing messages including special request questions, but not to admin manual overrides.
+
+**Stopping conditions:** Guest replies definitively, guest opts out, or max_reminders reached. After max reached → notify admins.
 
 ## Admin Interface (WhatsApp)
 
@@ -223,7 +243,7 @@ Commands are parsed with a keyword-first approach. The first word(s) identify th
 
 | Command | Syntax | Example | Action |
 |---------|--------|---------|--------|
-| שלח ל... | `שלח ל<group_name substring>` | שלח לחברים של החתן | Send to guests where group_name contains the substring |
+| שלח ל... | `שלח ל<group_name substring>` | שלח לחברים של החתן | Send to guests where group_name contains substring AND status='pending' (never re-invite) |
 | שלח לכולם | `שלח לכולם` | שלח לכולם | Send to all with status='pending' |
 | הוסף אורח | `הוסף <name> <phone> [side] [group]` | הוסף דוד כהן 0501234567 חתן חברים | Name = all words before phone, phone = first 05X/+972 match, side/group = remaining words |
 | סטטוס | `סטטוס` | סטטוס | Quick summary counts |
@@ -232,6 +252,8 @@ Commands are parsed with a keyword-first approach. The first word(s) identify th
 | עדכן | `עדכן <name or phone> <status> [num]` | עדכן דוד כהן מגיע 3 | Status keywords: מגיע/לא מגיע/מתלבט. If multiple name matches → reply with list |
 | ייבא | `ייבא` | ייבא | Reply with instructions to provide file path via CLI |
 | דוח יומי | `דוח יומי [ב-HH:MM]` | דוח יומי ב-20:00 | Change daily summary time |
+| עצור שליחה | `עצור שליחה` | עצור שליחה | Pause active batch send. Unsent messages cancelled, already-sent logged normally. Resume with `המשך שליחה` |
+| המשך שליחה | `המשך שליחה` | המשך שליחה | Resume a paused batch send from where it stopped |
 | עזרה | `עזרה` | עזרה | List available commands |
 
 **Error handling:** Unrecognized commands → reply "לא הבנתי. שלח 'עזרה' לרשימת פקודות". Name collisions → reply with numbered list of matches, ask admin to reply with number.
@@ -346,6 +368,32 @@ Meta template approval can take days to weeks and may be rejected.
 - **Tunnel:** cloudflared (free tier)
 - **Reply parsing:** Rule-based Hebrew + Claude API fallback
 
+### Webhook Design
+
+Two webhook endpoints, both under `/webhooks/`:
+- `POST /webhooks/sms` — Twilio SMS incoming messages + delivery status callbacks
+- `POST /webhooks/whatsapp` — Twilio WhatsApp incoming messages + delivery status callbacks
+
+The `channel` field in `messages` is set based on which endpoint received the request. Twilio is configured with separate webhook URLs for SMS and WhatsApp number.
+
+**Incoming message status:** Always set to `received`. Only outgoing messages use the `sent/delivered/read/failed` lifecycle.
+
+### Dashboard Auth
+
+The Express server uses middleware to distinguish webhook vs dashboard traffic:
+- Routes under `/webhooks/*` → no auth, validated via Twilio request signature (X-Twilio-Signature header)
+- Routes under `/api/*` and `/dashboard/*` → require bearer token from `DASHBOARD_TOKEN` in `.env`. Localhost requests (127.0.0.1) bypass auth for CLI convenience.
+
+### Milestones
+
+Configurable milestone thresholds in settings: `milestone_thresholds` = "50,100,150,200,250,300,350" (comma-separated). Each milestone fires once. Tracked via a `milestones_sent` setting key that records which thresholds have been notified.
+
+### Claude API for Level 3 Parsing
+
+- Model: claude-haiku-4-5 (fast, cheap)
+- Max tokens: 50
+- If API call fails (network, rate limit, quota) → classify as UNCLEAR → escalate to admins. Never block reply processing.
+
 ### Rate Limiting & Safety
 
 - Batch sending: 10 messages/minute (configurable)
@@ -388,6 +436,7 @@ wedding-notification/
 │   │   └── style.css      # RTL Hebrew styles
 │   └── js/
 │       └── app.js         # Dashboard JavaScript
+├── backups/               # Daily SQLite backups (auto-cleanup 30 days)
 ├── docs/
 │   └── superpowers/
 │       └── specs/
