@@ -28,7 +28,7 @@ function authMiddleware(req, res, next) {
   res.status(401).json({ error: 'Unauthorized' });
 }
 
-app.use('/api', authMiddleware);
+app.use('/api', authMiddleware, require('./src/routes/api'));
 app.use('/dashboard', authMiddleware, express.static(path.join(__dirname, 'dashboard')));
 
 // Health check
