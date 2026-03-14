@@ -423,3 +423,8 @@ curl -s -X POST h
 - 23:16 Read: package.json
 - 23:16 Read: server.js
 - 23:16 Read: admin.js
+- 23:24 Run: mkdir -p "/c/Users/user/Desktop/projects/wedding n
+- 23:25 Create: 2026-03-14-gemini-parser-design.md
+- 23:26 Read: 2026-03-14-gemini-parser-design.md
+- 23:27 Create: 2026-03-14-gemini-parser-design.md
+- 23:29 Run: cd "/c/Users/user/Desktop/projects/wedding notific
