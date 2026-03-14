@@ -281,3 +281,30 @@
 - 22:17 Read: reminders.html
 - 22:17 Read: settings.html
 - 22:17 Read: export.html
+- 22:17 Read: app.js
+- 22:17 Read: style.css
+- 22:17 Read: parser.test.js
+- 22:17 Read: admin.test.js
+- 22:17 Read: parser.js
+- 22:17 Read: twilio.js
+- 22:17 Read: db.test.js
+- 22:17 Read: importer.test.js
+- 22:17 Read: phone.test.js
+- 22:17 Edit: parser.js
+- 22:17 Edit: parser.js
+- 22:17 Read: reminder.test.js
+- 22:17 Read: package.json
+- 22:17 Edit: twilio.js
+- 22:18 Read: parser.test.js
+- 22:18 Run: cd "C:/Users/user/Desktop/projects/wedding notific
+- 22:18 Edit: parser.test.js
+- 22:18 Read: .env.example
+- 22:18 Run: cd "C:\Users\user\Desktop\projects\wedding notific
+- 22:18 Read: .gitignore
+- 22:18 Run: cd "C:/Users/user/Desktop/projects/wedding notific
+- 22:18 Run: cd "C:\Users\user\Desktop\projects\wedding notific
+- 22:18 Run: cd "C:/Users/user/Desktop/projects/wedding notific
+- 22:18 Run: cd "C:\Users\user\Desktop\projects\wedding notific
+- 22:22 Run: which cloudflared 2>/dev/null
+- 22:22 Run: winget list Cloudflare.cloudflared 2>/dev/null
+- 22:23 Run: winget install Cloudflare.cloudflared --accept-pac
