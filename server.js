@@ -7,6 +7,9 @@ const { getDb } = require('./src/db/db');
 const app = express();
 const PORT = process.env.PORT || 3860;
 
+// Trust reverse proxy (Render, etc.) so req.ip reflects real client IP
+app.set('trust proxy', true);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -29,7 +32,8 @@ function authMiddleware(req, res, next) {
 }
 
 app.use('/api', authMiddleware, require('./src/routes/api'));
-app.use('/dashboard', authMiddleware, express.static(path.join(__dirname, 'dashboard')));
+// Dashboard static files — no server-side auth; client-side JS handles token
+app.use('/dashboard', express.static(path.join(__dirname, 'dashboard')));
 
 // Twilio webhooks (no auth middleware — validated via Twilio signature)
 app.use('/webhooks', require('./src/routes/webhooks'));

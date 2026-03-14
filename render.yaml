@@ -20,5 +20,7 @@ services:
         value: Asia/Jerusalem
       - key: GEMINI_API_KEY
         sync: false
+      - key: WEBHOOK_BASE_URL
+        value: https://wedding-notification.onrender.com
       - key: NODE_ENV
         value: production

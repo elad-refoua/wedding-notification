@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>התחברות — ניהול חתונה</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', Tahoma, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 3rem 2.5rem;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      text-align: center;
+      max-width: 400px;
+      width: 90%;
+    }
+    .login-card h1 { font-size: 1.8rem; margin-bottom: 0.5rem; color: #333; }
+    .login-card p { color: #666; margin-bottom: 2rem; }
+    .login-card input {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      text-align: center;
+      direction: ltr;
+      margin-bottom: 1rem;
+      transition: border-color 0.2s;
+    }
+    .login-card input:focus { outline: none; border-color: #667eea; }
+    .login-card button {
+      width: 100%;
+      padding: 14px;
+      background: #667eea;
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .login-card button:hover { background: #5a6fd6; }
+    .error { color: #e74c3c; margin-top: 1rem; display: none; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h1>ניהול חתונה</h1>
+    <p>נתנאל ועמית</p>
+    <form id="loginForm">
+      <input type="password" id="token" placeholder="סיסמה" autocomplete="off" autofocus>
+      <button type="submit">כניסה</button>
+    </form>
+    <p class="error" id="error">סיסמה שגויה</p>
+  </div>
+  <script>
+    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const token = document.getElementById('token').value.trim();
+      if (!token) return;
+      try {
+        const res = await fetch('/api/stats', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (res.ok) {
+          sessionStorage.setItem('dashToken', token);
+          location.href = '/dashboard/index.html';
+        } else {
+          document.getElementById('error').style.display = 'block';
+        }
+      } catch {
+        document.getElementById('error').style.display = 'block';
+      }
+    });
+    // If already logged in, redirect
+    const existing = sessionStorage.getItem('dashToken');
+    if (existing) {
+      fetch('/api/stats', { headers: { 'Authorization': 'Bearer ' + existing } })
+        .then(r => { if (r.ok) location.href = '/dashboard/index.html'; });
+    }
+  </script>
+</body>
+</html>

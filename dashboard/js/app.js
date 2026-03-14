@@ -1,11 +1,47 @@
 /* Wedding Dashboard — Shared Utilities */
 
+// ──── Token management ────
+function getToken() {
+  // Check URL param first, then sessionStorage
+  const params = new URLSearchParams(location.search);
+  const urlToken = params.get('token');
+  if (urlToken) {
+    sessionStorage.setItem('dashToken', urlToken);
+    // Clean URL
+    params.delete('token');
+    const clean = params.toString();
+    history.replaceState(null, '', location.pathname + (clean ? '?' + clean : ''));
+    return urlToken;
+  }
+  return sessionStorage.getItem('dashToken');
+}
+
+function requireAuth() {
+  const token = getToken();
+  if (!token) {
+    location.href = '/dashboard/login.html';
+    return false;
+  }
+  return true;
+}
+
 // ──── API wrapper ────
 async function api(path, options = {}) {
+  const token = getToken();
+  if (!token) { location.href = '/dashboard/login.html'; return; }
   const res = await fetch('/api' + path, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...options.headers }
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + token,
+      ...options.headers
+    }
   });
+  if (res.status === 401) {
+    sessionStorage.removeItem('dashToken');
+    location.href = '/dashboard/login.html';
+    return;
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || res.statusText);
@@ -66,11 +102,14 @@ function sideLabel(side) {
   return map[side] || side || '';
 }
 
-// ──── Navigation highlighting ────
+// ──── Auth check on load (skip login page) ────
 document.addEventListener('DOMContentLoaded', () => {
-  const current = location.pathname.split('/').pop() || 'index.html';
+  const page = location.pathname.split('/').pop() || 'index.html';
+  if (page !== 'login.html') requireAuth();
+
+  // Navigation highlighting
   document.querySelectorAll('nav a').forEach(a => {
-    if (a.getAttribute('href') === current) a.classList.add('active');
+    if (a.getAttribute('href') === page) a.classList.add('active');
   });
 });
 
@@ -111,5 +150,6 @@ function getNavHTML() {
       <a href="reminders.html">תזכורות</a>
       <a href="settings.html">הגדרות</a>
       <a href="export.html">ייצוא</a>
+      <a href="#" onclick="sessionStorage.removeItem('dashToken');location.href='/dashboard/login.html'" style="margin-right:auto">יציאה</a>
     </nav>`;
 }
