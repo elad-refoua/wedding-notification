@@ -92,7 +92,6 @@ Server (always running)          Claude Code (on-demand)
 | num_invited | INTEGER DEFAULT 1 | How many people in this invitation |
 | num_coming | INTEGER DEFAULT 0 | How many confirmed coming |
 | status | TEXT DEFAULT 'pending' | pending/invited/coming/not_coming/undecided/opted_out |
-| special_req | TEXT | Dietary, accessibility, etc |
 | notes | TEXT | Free-form notes |
 | created_at | DATETIME | Record creation time |
 | updated_at | DATETIME | Last update time |
@@ -129,11 +128,9 @@ Server (always running)          Claude Code (on-demand)
 | max_reminders | Max reminders per guest (default: 10) |
 | invitation_template | Message template for invitations |
 | reminder_template | Message template for reminders |
-| special_req_template | Message template for special request question |
 | daily_summary_time | Time for daily WhatsApp summary (default: 20:00) |
 | batch_size | Messages per batch (default: 10) |
 | batch_delay_seconds | Delay between batches (default: 60) |
-| ask_special_requests | Ask about special requests after COMING (default: true) |
 | whatsapp_enabled | Enable WhatsApp channel (default: false, enable after Meta approval) |
 | admin_phones | Comma-separated admin phone numbers in E.164 format |
 
@@ -157,8 +154,6 @@ any ──(admin manual override)──→ any
 
 - A guest becomes `undecided` either from an explicit undecided reply OR after the first reminder fires (no response within `reminder_interval_days` of invitation).
 - Guests can change their mind at any time — the system always accepts the latest reply.
-- Special request question is sent automatically after a guest status becomes `coming` (configurable: on/off in settings via `ask_special_requests` key, default: on).
-
 ## Message Flow
 
 ### Outgoing (Invitations)
@@ -193,17 +188,6 @@ Prompt: "Classify this Hebrew wedding RSVP reply as COMING, NOT_COMING, UNDECIDE
 If Claude returns UNCLEAR → escalate to admins via WhatsApp.
 
 5. Update guest status + num_coming
-6. If status changed to `coming` and `ask_special_requests` is on → send special request question
-
-### Special Request Reply Handling
-
-After a guest confirms `coming`, the system sends the special request question. The guest's reply is handled as follows:
-
-1. If the guest's current status is `coming` and the last outgoing message was a special request question → treat the reply as a special request answer (not an RSVP).
-2. Store the reply text as-is in `guests.special_req` (free text, no parsing needed).
-3. Reply with confirmation: "תודה, רשמנו! 🙏"
-4. If the reply contains RSVP-like content ("actually we can't come"), the keyword parser still runs first. If it detects a status change → process as RSVP (overrides special request context). If no RSVP keywords → treat as special request.
-5. A guest can update their special request by sending another message — latest reply overwrites `special_req`.
 
 ### Reminders
 
@@ -215,7 +199,7 @@ After a guest confirms `coming`, the system sends the special request question. 
 **Hourly job:**
 - Every hour: query reminders WHERE `status = 'pending'` AND `scheduled_at <= now`.
 - For each: send reminder message, update reminder status to `sent`, create next reminder row if under max.
-- If guest has received any outgoing message in the last 24 hours → skip this reminder cycle (delay to next hour check). This is the "no duplicate within 24 hours" rule — it applies to all outgoing messages including special request questions, but not to admin manual overrides.
+- If guest has received any outgoing message in the last 24 hours → skip this reminder cycle (delay to next hour check). This is the "no duplicate within 24 hours" rule — it applies to all outgoing messages, but not to admin manual overrides.
 
 **Stopping conditions:** Guest replies definitively, guest opts out, or max_reminders reached. After max reached → notify admins.
 
@@ -326,7 +310,7 @@ Expected Excel columns (first row = headers):
 - Report: "Imported X guests. Skipped Y (Z duplicates, W invalid phones)."
 
 ### Export Format
-Same columns as import + status, num_coming, special_req. Filterable by status before export.
+Same columns as import + status, num_coming. Filterable by status before export.
 
 ## Twilio Setup
 
@@ -343,8 +327,6 @@ Same columns as import + status, num_coming, special_req. Filterable by status b
 
 - **Invitation:** Personalized wedding invitation with RSVP prompt
 - **Reminder:** Soft follow-up for undecided guests
-- **Special request:** Ask about dietary/accessibility needs
-
 Templates text TBD — will be configured via settings.
 
 ### Meta Approval Contingency
