@@ -37,11 +37,9 @@ describe('Hebrew reply parser', () => {
   });
 });
 
-describe('Level 3 Claude API fallback', () => {
-  it('classifyWithClaude returns status from API response', async () => {
-    const { classifyWithClaude } = require('../src/services/parser');
-    // Without API key, should gracefully return null
-    const result = await classifyWithClaude('אם הילדים יהיו בריאים אז כן');
+describe('Ambiguous messages', () => {
+  it('returns null status for ambiguous messages (escalated to admins)', () => {
+    const result = parseReply('צריך לראות מה המצב עם הסידורים');
     assert.strictEqual(result.status, null);
   });
 });

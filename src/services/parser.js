@@ -69,41 +69,4 @@ function parseReply(text) {
   return { status, numComing };
 }
 
-// Level 3: Claude Haiku API fallback for ambiguous replies
-async function classifyWithClaude(text) {
-  try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) return { status: null, numComing: null };
-
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 50,
-        messages: [{
-          role: 'user',
-          content: 'Classify this Hebrew wedding RSVP reply as COMING, NOT_COMING, UNDECIDED, or UNCLEAR. Reply with only the classification and optional number of guests. Reply: ' + text
-        }]
-      })
-    });
-
-    if (!response.ok) return { status: null, numComing: null };
-    const data = await response.json();
-    const answer = (data.content?.[0]?.text || '').trim().toUpperCase();
-
-    const statusMap = { 'COMING': 'coming', 'NOT_COMING': 'not_coming', 'UNDECIDED': 'undecided' };
-    const status = statusMap[answer.split(/\s/)[0]] || null;
-    const numMatch = answer.match(/(\d+)/);
-    return { status, numComing: numMatch ? parseInt(numMatch[1]) : null };
-  } catch (err) {
-    console.error('Claude API classification failed:', err.message);
-    return { status: null, numComing: null };
-  }
-}
-
-module.exports = { parseReply, classifyWithClaude };
+module.exports = { parseReply };

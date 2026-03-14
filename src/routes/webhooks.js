@@ -2,8 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { getDb, getSetting, setSetting } = require('../db/db');
 const { normalizePhone } = require('../utils/phone');
-const { sendSms, sendToAdmins, validateTwilioSignature } = require('../services/twilio');
-const { parseReply, classifyWithClaude } = require('../services/parser');
+const { sendSms, sendWhatsApp, sendToAdmins, validateTwilioSignature } = require('../services/twilio');
+const { parseReply } = require('../services/parser');
 const { executeAdminCommand } = require('../services/admin');
 
 // Twilio signature validation middleware (skip in dev)
@@ -18,6 +18,11 @@ function twilioAuth(req, res, next) {
 // Always respond 200 with empty TwiML to Twilio
 function twimlResponse(res) {
   res.type('text/xml').send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+}
+
+// Reply via the same channel the message came in on
+function reply(phone, body, channel) {
+  return channel === 'whatsapp' ? sendWhatsApp(phone, body) : sendSms(phone, body);
 }
 
 // Core incoming message handler (shared between SMS and WhatsApp)
@@ -38,10 +43,10 @@ async function handleIncoming(req, res, channel) {
   if (adminPhones.includes(from)) {
     try {
       const result = await executeAdminCommand(body, db);
-      await sendSms(from, result);
+      await reply(from, result, channel);
     } catch (err) {
       console.error('Admin command failed:', err.message);
-      await sendSms(from, 'שגיאה: ' + err.message);
+      await reply(from, 'שגיאה: ' + err.message, channel);
     }
     return twimlResponse(res);
   }
@@ -49,20 +54,15 @@ async function handleIncoming(req, res, channel) {
   // Not an admin — check if known guest
   if (!guest) {
     // Unknown sender
-    await sendSms(from, 'מצטערים, המספר שלך לא נמצא ברשימת המוזמנים. אם יש טעות, נא ליצור קשר עם נתנאל או עמית.');
+    await reply(from, 'מצטערים, המספר שלך לא נמצא ברשימת המוזמנים. אם יש טעות, נא ליצור קשר עם נתנאל או עמית.', channel);
     await sendToAdmins('הודעה ממספר לא מוכר: ' + from + '\nתוכן: ' + body);
     return twimlResponse(res);
   }
 
   // Known guest — parse RSVP reply
-  let result = parseReply(body);
+  const result = parseReply(body);
 
-  // Level 3: Claude API fallback if status is null
-  if (!result.status) {
-    result = await classifyWithClaude(body);
-  }
-
-  // Still null — escalate to admins
+  // Unrecognized reply — escalate to admins
   if (!result.status) {
     await sendToAdmins('לא הצלחתי לפענח תשובה מ-' + guest.name + ' (' + guest.phone + '):\n"' + body + '"');
     return twimlResponse(res);
@@ -74,7 +74,7 @@ async function handleIncoming(req, res, channel) {
       const num = result.numComing || guest.num_invited;
       db.prepare("UPDATE guests SET status='coming', num_coming=? WHERE id=?").run(num, guest.id);
       try { require('../services/reminder').cancelRemindersForGuest(guest.id); } catch (e) { /* reminder module not yet available */ }
-      await sendSms(from, 'תודה ' + guest.name + '! שמחים שאתם מגיעים' + (num > 1 ? ' (' + num + ' אנשים)' : '') + ' 🎉');
+      await reply(from, 'תודה ' + guest.name + '! שמחים שאתם מגיעים' + (num > 1 ? ' (' + num + ' אנשים)' : '') + ' 🎉', channel);
       // Check milestones
       checkMilestone(db);
       break;
@@ -82,24 +82,24 @@ async function handleIncoming(req, res, channel) {
     case 'not_coming': {
       db.prepare("UPDATE guests SET status='not_coming', num_coming=0 WHERE id=?").run(guest.id);
       try { require('../services/reminder').cancelRemindersForGuest(guest.id); } catch (e) { /* reminder module not yet available */ }
-      await sendSms(from, 'תודה על העדכון ' + guest.name + '. נשמח לראות אתכם באירוע אחר!');
+      await reply(from, 'תודה על העדכון ' + guest.name + '. נשמח לראות אתכם באירוע אחר!', channel);
       break;
     }
     case 'undecided': {
       db.prepare("UPDATE guests SET status='undecided' WHERE id=?").run(guest.id);
-      await sendSms(from, 'בסדר ' + guest.name + ', ניצור קשר שוב בהמשך. אפשר לעדכן בכל שלב!');
+      await reply(from, 'בסדר ' + guest.name + ', ניצור קשר שוב בהמשך. אפשר לעדכן בכל שלב!', channel);
       break;
     }
     case 'opted_out': {
       db.prepare("UPDATE guests SET status='opted_out' WHERE id=?").run(guest.id);
       try { require('../services/reminder').cancelRemindersForGuest(guest.id); } catch (e) { /* reminder module not yet available */ }
-      await sendSms(from, 'הוסרת מרשימת התפוצה. כדי לחזור, שלח "חידוש".');
+      await reply(from, 'הוסרת מרשימת התפוצה. כדי לחזור, שלח "חידוש".', channel);
       break;
     }
     case 're_enable': {
       db.prepare("UPDATE guests SET status='invited' WHERE id=?").run(guest.id);
       try { require('../services/reminder').createFirstReminder(guest.id); } catch (e) { /* reminder module not yet available */ }
-      await sendSms(from, 'חזרת לרשימה ' + guest.name + '! נשמח לשמוע אם תוכלו להגיע.');
+      await reply(from, 'חזרת לרשימה ' + guest.name + '! נשמח לשמוע אם תוכלו להגיע.', channel);
       break;
     }
   }
