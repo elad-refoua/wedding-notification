@@ -395,3 +395,5 @@
 curl -s -X POST http://localhos
 - 22:51 Run: curl -s http://localhost:3860/api/messages?limit=5
 - 22:51 Run: curl -s http://localhost:3860/api/stats
+- 22:53 Run: # Set Elad as admin
+curl -s -X PUT http://localhos
