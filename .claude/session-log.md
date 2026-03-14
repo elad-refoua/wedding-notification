@@ -397,3 +397,9 @@ curl -s -X POST http://localhos
 - 22:51 Run: curl -s http://localhost:3860/api/stats
 - 22:53 Run: # Set Elad as admin
 curl -s -X PUT http://localhos
+- 22:56 Run: # Add Netanel and Amit as guests
+curl -s -X POST h
+- 22:56 Run: curl -s http://localhost:3860/dashboard/
+- 22:57 Run: curl -s http://localhost:3860/api/guests
+- 22:58 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 22:58 Run: cd "/c/Users/user/Desktop/projects/wedding notific
