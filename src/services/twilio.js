@@ -1,13 +1,21 @@
 const twilio = require('twilio');
 const { getDb, getSetting } = require('../db/db');
 
-const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-const FROM_PHONE = process.env.TWILIO_PHONE_NUMBER;
+let _client = null;
+function getClient() {
+  if (!_client) {
+    _client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  }
+  return _client;
+}
+function getFromPhone() {
+  return process.env.TWILIO_PHONE_NUMBER;
+}
 
 async function sendSms(to, body) {
-  const msg = await client.messages.create({
+  const msg = await getClient().messages.create({
     body,
-    from: FROM_PHONE,
+    from: getFromPhone(),
     to,
     statusCallback: process.env.WEBHOOK_BASE_URL + '/webhooks/sms/status'
   });
@@ -15,15 +23,19 @@ async function sendSms(to, body) {
 }
 
 async function sendWhatsApp(to, body) {
-  const msg = await client.messages.create({
+  const msg = await getClient().messages.create({
     body,
-    from: 'whatsapp:' + FROM_PHONE,
+    from: 'whatsapp:' + getFromPhone(),
     to: 'whatsapp:' + to,
     statusCallback: process.env.WEBHOOK_BASE_URL + '/webhooks/whatsapp/status'
   });
   return msg.sid;
 }
 
+/**
+ * Send message to guest via SMS (+ WhatsApp if enabled). Logs to messages table.
+ * NOTE: Does NOT update guest.status — caller is responsible for status transitions.
+ */
 async function sendToGuest(guest, body) {
   const results = { sms: null, whatsapp: null };
   const db = getDb();
@@ -56,13 +68,19 @@ async function sendToGuest(guest, body) {
   return results;
 }
 
+/**
+ * Send notification to all admins via preferred channel.
+ * Uses WhatsApp if enabled, otherwise SMS — never both to avoid duplicates.
+ */
 async function sendToAdmins(body) {
   const adminPhones = (getSetting('admin_phones') || '').split(',').filter(Boolean);
+  const useWhatsApp = getSetting('whatsapp_enabled') === 'true';
   for (const phone of adminPhones) {
     try {
-      await sendSms(phone.trim(), body);
-      if (getSetting('whatsapp_enabled') === 'true') {
+      if (useWhatsApp) {
         await sendWhatsApp(phone.trim(), body);
+      } else {
+        await sendSms(phone.trim(), body);
       }
     } catch (err) {
       console.error('Admin notify failed for ' + phone + ':', err.message);
@@ -72,6 +90,9 @@ async function sendToAdmins(body) {
 
 function validateTwilioSignature(req) {
   const signature = req.headers['x-twilio-signature'];
+  if (!signature || !process.env.WEBHOOK_BASE_URL || !process.env.TWILIO_AUTH_TOKEN) {
+    return false;
+  }
   const url = process.env.WEBHOOK_BASE_URL + req.originalUrl;
   return twilio.validateRequest(process.env.TWILIO_AUTH_TOKEN, signature, url, req.body);
 }

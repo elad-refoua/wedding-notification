@@ -12,6 +12,13 @@ CREATE TABLE IF NOT EXISTS guests (
   updated_at DATETIME DEFAULT (datetime('now'))
 );
 
+CREATE TRIGGER IF NOT EXISTS guests_updated_at
+  AFTER UPDATE ON guests
+  FOR EACH ROW
+BEGIN
+  UPDATE guests SET updated_at = datetime('now') WHERE id = OLD.id;
+END;
+
 CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   guest_id INTEGER REFERENCES guests(id),

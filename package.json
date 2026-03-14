@@ -1,12 +1,13 @@
 {
   "name": "wedding-notification",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "server.js",
   "directories": {
     "doc": "docs"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "test": "node --test tests/**/*.test.js"
   },
   "keywords": [],
   "author": "",

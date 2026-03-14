@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const crypto = require('crypto');
 const { getDb } = require('./src/db/db');
 
 const app = express();
@@ -11,13 +12,18 @@ app.use(express.urlencoded({ extended: true }));
 
 // Auth middleware for API/dashboard routes
 function authMiddleware(req, res, next) {
-  const ip = req.ip || req.connection.remoteAddress;
+  const ip = req.ip || req.socket?.remoteAddress;
   if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') {
     return next();
   }
   const token = req.headers.authorization?.replace('Bearer ', '');
-  if (token === process.env.DASHBOARD_TOKEN) {
-    return next();
+  const expected = process.env.DASHBOARD_TOKEN;
+  if (token && expected && token.length === expected.length) {
+    const a = Buffer.from(token, 'utf8');
+    const b = Buffer.from(expected, 'utf8');
+    if (crypto.timingSafeEqual(a, b)) {
+      return next();
+    }
   }
   res.status(401).json({ error: 'Unauthorized' });
 }
