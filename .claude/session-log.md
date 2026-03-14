@@ -480,3 +480,11 @@ content = open('/tmp/gemin
 - 23:44 Edit: .env
 - 23:45 Run: taskkill.exe //F //IM node.exe 2>/dev/null; sleep 
 - 23:45 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 23:48 Run: gcloud config get-value project 2>/dev/null; gclou
+- 23:48 Run: gcloud config get-value project 2>&1; docker --ver
+- 23:49 Run: gcloud projects list --format="table(projectId,nam
+- 23:49 Run: gcloud auth login --no-launch-browser 2>&1
+- 23:50 Run: gh auth status 2>&1
+- 23:50 Read: .gitignore
+- 23:51 Run: cd "/c/Users/user/Desktop/projects/wedding notific
+- 23:51 Run: "/c/Program Files (x86)/cloudflared/cloudflared.ex
