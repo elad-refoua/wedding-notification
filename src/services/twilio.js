@@ -11,14 +11,17 @@ function getClient() {
   }
   return _client;
 }
-function getFromPhone() {
+function getSmsPhone() {
   return process.env.TWILIO_PHONE_NUMBER;
+}
+function getWhatsAppPhone() {
+  return process.env.TWILIO_WHATSAPP_NUMBER || process.env.TWILIO_PHONE_NUMBER;
 }
 
 async function sendSms(to, body) {
   const msg = await getClient().messages.create({
     body,
-    from: getFromPhone(),
+    from: getSmsPhone(),
     to,
     statusCallback: process.env.WEBHOOK_BASE_URL + '/webhooks/sms/status'
   });
@@ -28,7 +31,7 @@ async function sendSms(to, body) {
 async function sendWhatsApp(to, body) {
   const msg = await getClient().messages.create({
     body,
-    from: 'whatsapp:' + getFromPhone(),
+    from: 'whatsapp:' + getWhatsAppPhone(),
     to: 'whatsapp:' + to,
     statusCallback: process.env.WEBHOOK_BASE_URL + '/webhooks/whatsapp/status'
   });

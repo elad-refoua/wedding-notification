@@ -53,7 +53,9 @@ node --test tests/*.test.js   # Run tests (72 tests, 15 suites)
 
 ## Environment Variables
 ```
-TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_PHONE_NUMBER
+TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+TWILIO_PHONE_NUMBER=+16562554592 (SMS - real US number)
+TWILIO_WHATSAPP_NUMBER=+14155238886 (WhatsApp sandbox)
 DASHBOARD_TOKEN
 GEMINI_API_KEY
 WEBHOOK_BASE_URL=https://wedding-notification.onrender.com
