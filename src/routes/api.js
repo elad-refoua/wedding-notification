@@ -178,7 +178,35 @@ router.post('/send-invitations', async (req, res) => {
   }
 });
 
-// POST /api/import
+// POST /api/test-sms — send a test SMS to a phone number
+router.post('/test-sms', async (req, res) => {
+  try {
+    const { sendSms } = require('../services/twilio');
+    const phone = normalizePhone(req.body.phone);
+    if (!phone) return res.status(400).json({ error: 'מספר טלפון לא תקין' });
+    const message = req.body.message || 'הודעת ניסיון ממערכת החתונה של נתנאל ועמית 💍';
+    const sid = await sendSms(phone, message);
+    res.json({ success: true, sid, message: 'SMS נשלח בהצלחה ל-' + phone });
+  } catch (e) {
+    res.status(500).json({ error: 'שליחה נכשלה: ' + e.message });
+  }
+});
+
+// POST /api/import-upload — import guests from uploaded Excel file (base64)
+router.post('/import-upload', (req, res) => {
+  try {
+    const { importExcelFromBuffer } = require('../services/importer');
+    const { data } = req.body;
+    if (!data) return res.status(400).json({ error: 'No file data' });
+    const buffer = Buffer.from(data, 'base64');
+    const result = importExcelFromBuffer(buffer);
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/import (legacy — server file path)
 router.post('/import', async (req, res) => {
   try {
     const { importExcel } = require('../services/importer');

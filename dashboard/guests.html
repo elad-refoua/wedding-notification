@@ -79,16 +79,18 @@
     <!-- Import Section -->
     <div class="card" style="margin-top:1.5rem;">
       <h2 style="font-size:1rem; margin-bottom:0.75rem;">ייבוא מאקסל</h2>
+      <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:0.75rem;">בחרו קובץ <code>.xlsx</code> עם עמודות: שם, טלפון, צד, קבוצה, מוזמנים, הערות. ראו <a href="guide.html" style="color:#0ea5e9">מדריך</a> לפרטים.</p>
       <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
         <div class="form-group" style="flex:1;">
-          <label>נתיב קובץ Excel</label>
-          <input type="text" id="importPath" placeholder="C:\path\to\guests.xlsx">
+          <label>קובץ Excel</label>
+          <input type="file" id="importFile" accept=".xlsx,.xls" style="color:#cbd5e1;">
         </div>
         <div class="form-group">
           <label>&nbsp;</label>
-          <button class="btn btn-success" onclick="importExcel()">ייבוא</button>
+          <button class="btn btn-success" onclick="importExcel()" id="importBtn">ייבוא</button>
         </div>
       </div>
+      <div id="importResult" style="margin-top:0.75rem; display:none;"></div>
     </div>
   </div>
 
@@ -315,14 +317,33 @@
     }
 
     async function importExcel() {
-      var filePath = document.getElementById('importPath').value.trim();
-      if (!filePath) { showToast('נא להזין נתיב קובץ', 'error'); return; }
+      var fileInput = document.getElementById('importFile');
+      var btn = document.getElementById('importBtn');
+      var resultDiv = document.getElementById('importResult');
+      if (!fileInput.files || !fileInput.files[0]) { showToast('נא לבחור קובץ', 'error'); return; }
+      var file = fileInput.files[0];
+      btn.disabled = true;
+      btn.textContent = 'מייבא...';
+      resultDiv.style.display = 'none';
       try {
-        var result = await api('/import', { method: 'POST', body: JSON.stringify({ filePath: filePath }) });
-        showToast('ייבוא הושלם: ' + (result.imported || 0) + ' אורחים', 'success');
+        var arrayBuffer = await file.arrayBuffer();
+        var base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(arrayBuffer)));
+        var result = await api('/import-upload', { method: 'POST', body: JSON.stringify({ data: base64 }) });
+        var msg = 'ייבוא הושלם: ' + (result.imported || 0) + ' אורחים יובאו';
+        if (result.skipped) msg += ', ' + result.skipped + ' דולגו';
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#4ade80';
+        resultDiv.textContent = msg;
+        showToast(msg, 'success');
         loadGuests();
       } catch (err) {
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#f87171';
+        resultDiv.textContent = 'שגיאה: ' + err.message;
         showToast('שגיאת ייבוא: ' + err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'ייבוא';
       }
     }
 

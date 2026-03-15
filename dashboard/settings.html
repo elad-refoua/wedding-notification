@@ -88,6 +88,27 @@
         <button type="submit" class="btn btn-primary">שמור הגדרות</button>
       </div>
     </form>
+
+    <!-- Test SMS -->
+    <div class="card" style="margin-top:1.5rem;">
+      <h2 style="font-size:1.1rem; margin-bottom:0.5rem;">שליחת הודעת ניסיון</h2>
+      <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;">שלחו SMS לבדיקה שהמערכת עובדת. <strong style="color:#fbbf24;">שימו לב:</strong> בחשבון ניסיוני של Twilio, אפשר לשלוח רק למספרים מאומתים.</p>
+      <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
+        <div class="form-group" style="flex:1; min-width:200px;">
+          <label>מספר טלפון</label>
+          <input type="tel" id="testPhone" dir="ltr" placeholder="0525373331" value="0525373331">
+        </div>
+        <div class="form-group" style="flex:2; min-width:250px;">
+          <label>הודעה (אופציונלי)</label>
+          <input type="text" id="testMessage" placeholder="הודעת ניסיון ממערכת החתונה">
+        </div>
+        <div class="form-group">
+          <label>&nbsp;</label>
+          <button class="btn btn-success" onclick="sendTestSms()" id="testSmsBtn">שלח SMS ניסיון</button>
+        </div>
+      </div>
+      <div id="testResult" style="margin-top:0.75rem; display:none;"></div>
+    </div>
   </div>
 
   <script src="js/app.js"></script>
@@ -139,6 +160,34 @@
         showToast('הגדרות נשמרו בהצלחה', 'success');
       } catch (e) {
         showToast('שגיאה: ' + e.message, 'error');
+      }
+    }
+
+    async function sendTestSms() {
+      var btn = document.getElementById('testSmsBtn');
+      var resultDiv = document.getElementById('testResult');
+      var phone = document.getElementById('testPhone').value.trim();
+      var message = document.getElementById('testMessage').value.trim();
+      if (!phone) { showToast('נא להזין מספר טלפון', 'error'); return; }
+      btn.disabled = true;
+      btn.textContent = 'שולח...';
+      resultDiv.style.display = 'none';
+      try {
+        var body = { phone: phone };
+        if (message) body.message = message;
+        var result = await api('/test-sms', { method: 'POST', body: JSON.stringify(body) });
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#4ade80';
+        resultDiv.textContent = result.message || 'נשלח בהצלחה!';
+        showToast('SMS נשלח!', 'success');
+      } catch (e) {
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#f87171';
+        resultDiv.textContent = e.message || 'שליחה נכשלה';
+        showToast('שגיאה: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'שלח SMS ניסיון';
       }
     }
 

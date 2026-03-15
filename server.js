@@ -10,7 +10,7 @@ const PORT = process.env.PORT || 3860;
 // Trust reverse proxy (Render, etc.) so req.ip reflects real client IP
 app.set('trust proxy', true);
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
 // Auth middleware for API/dashboard routes
