@@ -181,12 +181,22 @@ router.post('/send-invitations', async (req, res) => {
 // POST /api/test-sms — send a test SMS to a phone number
 router.post('/test-sms', async (req, res) => {
   try {
-    const { sendSms } = require('../services/twilio');
+    const { sendSms, formatTwilioError } = require('../services/twilio');
     const phone = normalizePhone(req.body.phone);
     if (!phone) return res.status(400).json({ error: 'מספר טלפון לא תקין' });
     const message = req.body.message || 'הודעת ניסיון ממערכת החתונה של נתנאל ועמית 💍';
-    const sid = await sendSms(phone, message);
-    res.json({ success: true, sid, message: 'SMS נשלח בהצלחה ל-' + phone });
+    try {
+      const sid = await sendSms(phone, message);
+      res.json({ success: true, sid, message: 'SMS נשלח בהצלחה ל-' + phone });
+    } catch (err) {
+      const detail = formatTwilioError(err);
+      console.error('Test SMS failed for ' + phone + ':', detail);
+      res.status(502).json({
+        error: 'שליחה נכשלה: ' + detail,
+        twilio_code: err.code || null,
+        more_info: err.moreInfo || null
+      });
+    }
   } catch (e) {
     res.status(500).json({ error: 'שליחה נכשלה: ' + e.message });
   }

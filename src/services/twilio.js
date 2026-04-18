@@ -53,9 +53,10 @@ async function sendToGuest(guest, body) {
     db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status, twilio_sid) VALUES (?, ?, ?, ?, ?, ?)')
       .run(guest.id, 'outgoing', 'sms', body, 'sent', sid);
   } catch (err) {
-    console.error('SMS failed for ' + guest.phone + ':', err.message);
-    db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status) VALUES (?, ?, ?, ?, ?)')
-      .run(guest.id, 'outgoing', 'sms', body, 'failed');
+    const detail = formatTwilioError(err);
+    console.error('SMS failed for ' + guest.phone + ':', detail);
+    db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status, error) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(guest.id, 'outgoing', 'sms', body, 'failed', detail);
   }
 
   if (whatsappEnabled) {
@@ -65,13 +66,22 @@ async function sendToGuest(guest, body) {
       db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status, twilio_sid) VALUES (?, ?, ?, ?, ?, ?)')
         .run(guest.id, 'outgoing', 'whatsapp', body, 'sent', sid);
     } catch (err) {
-      console.error('WhatsApp failed for ' + guest.phone + ':', err.message);
-      db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status) VALUES (?, ?, ?, ?, ?)')
-        .run(guest.id, 'outgoing', 'whatsapp', body, 'failed');
+      const detail = formatTwilioError(err);
+      console.error('WhatsApp failed for ' + guest.phone + ':', detail);
+      db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status, error) VALUES (?, ?, ?, ?, ?, ?)')
+        .run(guest.id, 'outgoing', 'whatsapp', body, 'failed', detail);
     }
   }
 
   return results;
+}
+
+function formatTwilioError(err) {
+  if (!err) return 'unknown error';
+  const code = err.code ? '[' + err.code + '] ' : '';
+  const msg = err.message || String(err);
+  const more = err.moreInfo ? ' — ' + err.moreInfo : '';
+  return (code + msg + more).slice(0, 1000);
 }
 
 /**
@@ -103,4 +113,4 @@ function validateTwilioSignature(req) {
   return twilio.validateRequest(process.env.TWILIO_AUTH_TOKEN, signature, url, req.body);
 }
 
-module.exports = { sendSms, sendWhatsApp, sendToGuest, sendToAdmins, validateTwilioSignature };
+module.exports = { sendSms, sendWhatsApp, sendToGuest, sendToAdmins, validateTwilioSignature, formatTwilioError };

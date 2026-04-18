@@ -14,8 +14,16 @@ function getDb() {
     db.pragma('foreign_keys = ON');
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
     db.exec(schema);
+    runMigrations(db);
   }
   return db;
+}
+
+function runMigrations(d) {
+  const cols = d.prepare("PRAGMA table_info(messages)").all().map(c => c.name);
+  if (!cols.includes('error')) {
+    d.prepare("ALTER TABLE messages ADD COLUMN error TEXT").run();
+  }
 }
 
 function getSetting(key) {

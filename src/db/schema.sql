@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS messages (
   content TEXT,
   status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'delivered', 'read', 'failed', 'received')),
   twilio_sid TEXT,
+  error TEXT,
   created_at DATETIME DEFAULT (datetime('now'))
 );
 
