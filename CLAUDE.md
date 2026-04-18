@@ -17,7 +17,9 @@ node --test --test-name-pattern='<x>' tests/parser.test.js   # Run tests matchin
 ```
 There is no build step, bundler, or linter configured. Tests use Node's built-in `node:test` runner.
 
-Deployment: pushes to `master` auto-deploy to Render.com (`https://wedding-notification.onrender.com`).
+**Production URL:** `https://wedding-notification-246665220680.europe-west1.run.app`
+
+Deployment is Google Cloud Run in project `wedding-netanel-amit` (isolated from menti). See `docs/DEPLOYMENT.md` for the full runbook. Pushing to `master` does NOT auto-deploy — trigger a new revision with `gcloud run deploy wedding-notification --source . --region europe-west1` (from the `wedding` gcloud configuration).
 
 ## Architecture
 
@@ -54,10 +56,13 @@ Never add other AI providers — Gemini is the only approved fallback.
 - `backupDatabase()` — daily copy of `guests.db` → `backups/guests-YYYY-MM-DD.db`; keeps last 7.
 
 ### Data layer (`src/db/db.js`, `src/db/schema.sql`)
-- SQLite via `better-sqlite3`, WAL mode, foreign keys ON, singleton `getDb()`.
-- Schema is **idempotent** — the entire `schema.sql` is re-applied on every `getDb()` call. New tables/columns must use `CREATE ... IF NOT EXISTS` / `INSERT OR IGNORE`. There are no migrations.
+- SQLite via `better-sqlite3`, foreign keys ON, singleton `getDb()`.
+- **`DB_PATH` env var** picks the file location (defaults to `./guests.db` for local dev). On Cloud Run it's `/data/guests.db` where `/data` is a GCS Cloud Storage volume mount to `gs://wedding-netanel-amit-data` — the DB file is therefore durable across restarts/revisions.
+- **`DB_JOURNAL_MODE` env var** picks the journal mode. Local dev: `WAL` (default, fastest). Cloud Run (GCS FUSE): must be `DELETE` — WAL uses mmap which does not work over networked filesystems.
+- **Cloud Run single-writer constraint** — the service is deployed with `--max-instances 1` because SQLite over a shared GCS volume cannot tolerate concurrent writers. Do not raise this limit without switching databases.
+- Schema is **idempotent** — the entire `schema.sql` is re-applied on every `getDb()` call. New tables/columns must use `CREATE ... IF NOT EXISTS` / `INSERT OR IGNORE`. Column additions to existing tables use the `runMigrations()` pattern in `db.js` (see the `ALTER TABLE … ADD COLUMN error` migration for the template).
 - Settings are key/value strings in the `settings` table, accessed via `getSetting` / `setSetting`. Defaults (invitation template, reminder interval, batch size, Gemini quota, admin phones, etc.) are seeded from `schema.sql`.
-- Tables: `guests`, `messages` (incoming+outgoing log), `reminders` (schedule+status), `settings`.
+- Tables: `guests`, `messages` (incoming+outgoing log; `error` column captures Twilio failure detail), `reminders` (schedule+status), `settings`.
 
 ### Auth (`server.js`)
 - `/api/*` — Bearer token against `DASHBOARD_TOKEN`, compared with `crypto.timingSafeEqual`.
@@ -73,14 +78,20 @@ All numbers are normalized to E.164 Israeli format (+972…) at every entry poin
 Phones listed in the `admin_phones` setting (comma-separated, normalized) can send Hebrew commands: `סטטוס`, `עזרה`, `שלח לכולם`, `שלח ל<קבוצה>`, `הוסף <שם> <טלפון> [חתן|כלה] [קבוצה]`, `עצור שליחה`, `המשך שליחה`. Admin messages are routed before guest-reply parsing.
 
 ## Environment Variables
+In production these come from Secret Manager (secrets) or `gcloud run services update --set-env-vars` (non-secrets). In local dev they come from `.env`.
 ```
+# Secrets (Secret Manager in prod, .env locally) — never committed
 TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
 TWILIO_PHONE_NUMBER              # SMS sender (real US number)
 TWILIO_WHATSAPP_NUMBER           # WhatsApp sandbox (+14155238886); falls back to TWILIO_PHONE_NUMBER
 DASHBOARD_TOKEN                  # Dashboard + API Bearer token
 GEMINI_API_KEY                   # Level 3 parser
-WEBHOOK_BASE_URL                 # e.g. https://wedding-notification.onrender.com — used for Twilio statusCallback URLs
-PORT                             # default 3860
+
+# Non-secrets
+WEBHOOK_BASE_URL                 # Cloud Run URL, used in Twilio statusCallback URLs
+DB_PATH                          # /data/guests.db on Cloud Run; defaults to ./guests.db locally
+DB_JOURNAL_MODE                  # DELETE on Cloud Run (networked FS); WAL locally (default)
+PORT                             # 8080 on Cloud Run; defaults to 3860 locally
 TZ=Asia/Jerusalem
 NODE_ENV=production              # gates Twilio signature validation
 ```
