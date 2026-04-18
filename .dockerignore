@@ -1,0 +1,17 @@
+node_modules
+.git
+.gitignore
+.env
+.env.example
+guests.db
+guests.db-shm
+guests.db-wal
+backups/
+exports/
+tests/
+docs/
+.claude/
+*.md
+.dockerignore
+Dockerfile
+render.yaml

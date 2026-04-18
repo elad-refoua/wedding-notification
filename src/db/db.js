@@ -2,15 +2,19 @@ const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
 
-const DB_PATH = path.join(__dirname, '..', '..', 'guests.db');
+const DB_PATH = process.env.DB_PATH || path.join(__dirname, '..', '..', 'guests.db');
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 let db;
 
 function getDb() {
   if (!db) {
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
+    // WAL uses mmap and doesn't work over networked filesystems (GCS FUSE).
+    // DELETE mode is slower but correct on any filesystem.
+    db.pragma(process.env.DB_JOURNAL_MODE ? 'journal_mode = ' + process.env.DB_JOURNAL_MODE : 'journal_mode = WAL');
     db.pragma('foreign_keys = ON');
     const schema = fs.readFileSync(SCHEMA_PATH, 'utf8');
     db.exec(schema);
