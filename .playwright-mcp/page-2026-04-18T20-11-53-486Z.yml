@@ -1,0 +1,41 @@
+- generic [ref=e1]:
+  - link [ref=e2] [cursor=pointer]:
+    - /url: "#"
+    - text: ___
+  - generic [ref=e4]:
+    - main [ref=e7]:
+      - generic [ref=e10]:
+        - generic [ref=e11]:
+          - img "Twilio" [ref=e12]
+          - heading "Welcome" [level=1] [ref=e13]
+          - paragraph [ref=e15]: Login to Twilio to continue to Twilio Console.
+        - generic [ref=e16]:
+          - generic [ref=e17]:
+            - generic [ref=e19]:
+              - generic [ref=e21]:
+                - generic [ref=e22]: Email address *
+                - textbox "Email address" [active] [ref=e23]: eladrefoua@gmail.com
+              - generic [ref=e25]:
+                - generic [ref=e26]: Password *
+                - textbox "Password" [ref=e27]
+                - switch "Show password" [ref=e28] [cursor=pointer]
+            - paragraph [ref=e32]:
+              - link "Reset password" [ref=e33] [cursor=pointer]:
+                - /url: /u/login/password-reset-start/TwilioUserCredentials/eladrefoua%40gmail.com?state=hKFo2SAxNjBOVjRuZ0lIYmZNaWphUHgwd0thaG9ZalB1UndwZKFur3VuaXZlcnNhbC1sb2dpbqN0aWTZIHRIYXJwZC1DTjczNVIyWlFjQnZuSk9CTWdqR1V1OGVxo2NpZNkgTW05M1lTTDVSclpmNzdobUlKZFI3QktZYjZPOXV1cks
+            - button "Continue" [ref=e35] [cursor=pointer]
+          - paragraph [ref=e37]:
+            - text: Don't have an account?
+            - link "Sign up" [ref=e38] [cursor=pointer]:
+              - /url: https://www.twilio.com/try-twilio
+    - contentinfo [ref=e39]:
+      - generic [ref=e40]:
+        - link "Terms of service" [ref=e41] [cursor=pointer]:
+          - /url: https://www.twilio.com/legal/tos
+        - text: "|"
+        - link "Privacy policy" [ref=e42] [cursor=pointer]:
+          - /url: https://www.twilio.com/legal/privacy
+      - generic [ref=e43]:
+        - text: © 2026
+        - link "Twilio" [ref=e44] [cursor=pointer]:
+          - /url: https://www.twilio.com/
+        - text: Inc. all rights reserved
