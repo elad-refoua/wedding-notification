@@ -1,0 +1,116 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e13]:
+    - generic [ref=e16]:
+      - generic [ref=e18]:
+        - link "Go to Console homepage Twilio Home" [ref=e19] [cursor=pointer]:
+          - /url: https://www.twilio.com/console/projects/summary
+          - generic [ref=e21]:
+            - img "Go to Console homepage" [ref=e23]
+            - text: Twilio Home
+        - generic [ref=e25]:
+          - generic [ref=e28]:
+            - generic "mainAccount" [ref=e30]: elad
+            - button "Switch accounts" [ref=e31] [cursor=pointer]:
+              - generic [ref=e32]:
+                - img [ref=e34]
+                - generic [ref=e36]: Switch accounts
+          - generic [ref=e37]:
+            - text: "Trial:"
+            - strong [ref=e564]: $13.161
+            - link "Upgrade" [ref=e565] [cursor=pointer]:
+              - /url: /account/upgrade
+              - strong [ref=e566]: Upgrade
+      - generic [ref=e41]:
+        - generic [ref=e44]:
+          - img [ref=e47]
+          - combobox [ref=e49]:
+            - textbox [ref=e50]:
+              - /placeholder: Jump to...
+            - listbox
+        - button "Admin" [ref=e51] [cursor=pointer]:
+          - generic [ref=e52]:
+            - text: Admin
+            - img [ref=e54]
+        - button "Notifications success" [ref=e57] [cursor=pointer]:
+          - generic [ref=e59]:
+            - img "Notifications" [ref=e61]
+            - img "success" [ref=e64]
+        - button [ref=e66] [cursor=pointer]:
+          - img [ref=e69]
+        - button "Switch products" [ref=e71] [cursor=pointer]:
+          - generic [ref=e72]:
+            - img [ref=e74]
+            - generic [ref=e76]: Switch products
+        - button "User Name" [ref=e80] [cursor=pointer]:
+          - generic [ref=e82]:
+            - img "User Name" [ref=e86]
+            - img [ref=e89]
+    - generic [ref=e91]:
+      - link "Skip to content" [ref=e92] [cursor=pointer]:
+        - /url: "#content"
+      - link "Skip to navigation" [ref=e93] [cursor=pointer]:
+        - /url: "#97"
+      - link "Skip to topbar" [ref=e94] [cursor=pointer]:
+        - /url: "#topbar"
+    - complementary [ref=e95]:
+      - navigation "console-sidebar" [ref=e97]:
+        - generic [ref=e567]:
+          - button "Back" [ref=e570] [cursor=pointer]:
+            - generic [ref=e571]:
+              - img [ref=e573]
+              - paragraph [ref=e575]: Back
+          - separator [ref=e576]
+          - generic [ref=e578]:
+            - generic [ref=e579]:
+              - img [ref=e581]
+              - paragraph [ref=e583]: Manage Billing
+            - link "Upgrade" [ref=e585] [cursor=pointer]:
+              - /url: /us1/billing/manage-billing/upgrade
+              - generic [ref=e586]: Upgrade
+            - link "Billing overview" [ref=e588] [cursor=pointer]:
+              - /url: /us1/billing/manage-billing/billing-overview
+              - generic [ref=e589]: Billing overview
+            - link "Pricing" [ref=e591] [cursor=pointer]:
+              - /url: /us1/billing/manage-billing/pricing?frameUrl=%2Fconsole%2Fbilling%2Fpricing%3Fx-target-region%3Dus1
+              - generic [ref=e592]: Pricing
+            - separator [ref=e593]
+          - generic [ref=e595]:
+            - generic [ref=e596]:
+              - img [ref=e598]
+              - paragraph [ref=e600]: Usage
+            - link "Usage summary" [ref=e602] [cursor=pointer]:
+              - /url: /us1/billing/usage/summary?frameUrl=%2Fconsole%2Fusage%3Fx-target-region%3Dus1
+              - generic [ref=e603]: Usage summary
+            - link "Usage by subaccount" [ref=e605] [cursor=pointer]:
+              - /url: /us1/billing/usage/subaccount-usage?frameUrl=%2Fconsole%2Fusage%2Fsubaccounts%3Fx-target-region%3Dus1
+              - generic [ref=e606]: Usage by subaccount
+            - link "Triggers" [ref=e608] [cursor=pointer]:
+              - /url: /us1/billing/usage/triggers?frameUrl=%2Fconsole%2Fusage%2Ftriggers%3Fx-target-region%3Dus1
+              - generic [ref=e609]: Triggers
+            - link "Authorized apps" [ref=e611] [cursor=pointer]:
+              - /url: /us1/billing/usage/authorized-apps?frameUrl=%2Fconsole%2Fusage%2Fauthorized-app%3Fx-target-region%3Dus1
+              - generic [ref=e612]: Authorized apps
+            - separator [ref=e613]
+          - generic [ref=e615]:
+            - generic [ref=e616]:
+              - img [ref=e618]
+              - paragraph [ref=e620]: Nonprofit benefits
+            - link "Sign up" [ref=e622] [cursor=pointer]:
+              - /url: /us1/billing/nonprofit-benefits/sign-up
+              - generic [ref=e623]: Sign up
+            - link "Builder Hub" [ref=e625] [cursor=pointer]:
+              - /url: /us1/billing/nonprofit-benefits/resources
+              - generic [ref=e626]: Builder Hub
+      - button "Close sidebar" [expanded] [ref=e273] [cursor=pointer]:
+        - generic [ref=e274]:
+          - img [ref=e276]
+          - generic [ref=e278]: Close sidebar
+    - generic [ref=e629]:
+      - heading "We've upgraded our experience!" [level=2] [ref=e630]
+      - paragraph [ref=e631]: You'll be automatically redirected in a few seconds.
+      - link "Go to Upgrade" [ref=e632] [cursor=pointer]:
+        - /url: /account/upgrade
+        - generic [ref=e633]:
+          - text: Go to Upgrade
+          - img [ref=e636]
+  - status [ref=e460]

@@ -1,0 +1,181 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "Render" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img "Render" [ref=e8]
+        - button "M My Workspace" [ref=e12] [cursor=pointer]:
+          - generic [ref=e13]:
+            - generic [ref=e14]: M
+            - generic "My Workspace" [ref=e15]
+            - img [ref=e16]
+      - generic [ref=e20]:
+        - navigation [ref=e21]:
+          - list [ref=e22]:
+            - listitem [ref=e23]:
+              - link "wedding-notification" [ref=e24] [cursor=pointer]:
+                - /url: /web/srv-d6qu7d15pdvs73bhgjc0
+                - img [ref=e25]
+                - generic [ref=e27]: wedding-notification
+              - button [ref=e30] [cursor=pointer]:
+                - img [ref=e31]
+        - button "Search Ctrl + K" [ref=e34] [cursor=pointer]:
+          - img [ref=e36]
+          - text: Search
+          - generic [ref=e38]:
+            - img [ref=e39]
+            - generic [ref=e41]: Ctrl
+            - generic [ref=e42]: +
+            - generic [ref=e43]: K
+            - generic [ref=e44]: K
+      - generic [ref=e45]:
+        - button "New" [ref=e47] [cursor=pointer]:
+          - generic [ref=e48]:
+            - img [ref=e49]
+            - generic [ref=e51]: New
+        - button "Upgrade" [ref=e53] [cursor=pointer]:
+          - generic [ref=e54]:
+            - img [ref=e55]
+            - generic [ref=e57]: Upgrade
+        - button "Help" [ref=e59] [cursor=pointer]:
+          - img "Help" [ref=e60]
+        - button "e" [ref=e65] [cursor=pointer]:
+          - generic [ref=e67]: e
+    - generic [ref=e68]:
+      - navigation [ref=e69]:
+        - separator [ref=e70]
+        - generic [ref=e71]:
+          - generic [ref=e72]:
+            - link "Dashboard" [ref=e73] [cursor=pointer]:
+              - /url: /
+              - img [ref=e74]
+              - generic [ref=e76]: Dashboard
+            - generic [ref=e77]:
+              - img [ref=e78]
+              - generic [ref=e80]: wedding-notification
+          - generic [ref=e81]:
+            - list [ref=e82]:
+              - listitem [ref=e83]:
+                - link "Events" [ref=e84] [cursor=pointer]:
+                  - /url: /web/srv-d6qu7d15pdvs73bhgjc0/events
+                  - img [ref=e85]
+                  - generic [ref=e92]: Events
+              - listitem [ref=e93]:
+                - link "Settings" [ref=e94] [cursor=pointer]:
+                  - /url: /web/srv-d6qu7d15pdvs73bhgjc0/settings
+                  - img [ref=e95]
+                  - generic [ref=e98]: Settings
+            - generic [ref=e99]:
+              - generic [ref=e100]: Monitor
+              - list "Monitor" [ref=e101]:
+                - listitem [ref=e102]:
+                  - link "Logs" [ref=e103] [cursor=pointer]:
+                    - /url: /web/srv-d6qu7d15pdvs73bhgjc0/logs
+                    - img [ref=e104]
+                    - generic [ref=e109]: Logs
+                - listitem [ref=e110]:
+                  - link "Metrics" [ref=e111] [cursor=pointer]:
+                    - /url: /web/srv-d6qu7d15pdvs73bhgjc0/metrics
+                    - img [ref=e112]
+                    - generic [ref=e114]: Metrics
+            - generic [ref=e115]:
+              - generic [ref=e116]: Manage
+              - list "Manage" [ref=e117]:
+                - listitem [ref=e118]:
+                  - link "Environment" [ref=e119] [cursor=pointer]:
+                    - /url: /web/srv-d6qu7d15pdvs73bhgjc0/env
+                    - img [ref=e120]
+                    - generic [ref=e124]: Environment
+                - listitem [ref=e125]:
+                  - link "Shell" [ref=e126] [cursor=pointer]:
+                    - /url: /web/srv-d6qu7d15pdvs73bhgjc0/shell
+                    - img [ref=e127]
+                    - generic [ref=e131]:
+                      - generic [ref=e132]: Shell
+                      - status [ref=e135]:
+                        - img [ref=e136]
+                - listitem [ref=e138]:
+                  - link "Scaling" [ref=e139] [cursor=pointer]:
+                    - /url: /web/srv-d6qu7d15pdvs73bhgjc0/scaling
+                    - img [ref=e140]
+                    - generic [ref=e145]:
+                      - generic [ref=e146]: Scaling
+                      - status [ref=e149]:
+                        - img [ref=e150]
+                - listitem [ref=e152]:
+                  - link "Previews" [ref=e153] [cursor=pointer]:
+                    - /url: /web/srv-d6qu7d15pdvs73bhgjc0/previews
+                    - img [ref=e154]
+                    - generic [ref=e158]: Previews
+                - listitem [ref=e159]:
+                  - link "Disk" [ref=e160] [cursor=pointer]:
+                    - /url: /web/srv-d6qu7d15pdvs73bhgjc0/disks
+                    - img [ref=e161]
+                    - generic [ref=e166]:
+                      - generic [ref=e167]: Disk
+                      - status [ref=e170]:
+                        - img [ref=e171]
+                - listitem [ref=e173]:
+                  - link "One-Off Jobs" [ref=e174] [cursor=pointer]:
+                    - /url: /web/srv-d6qu7d15pdvs73bhgjc0/jobs
+                    - img [ref=e175]
+                    - generic [ref=e181]:
+                      - generic [ref=e182]: One-Off Jobs
+                      - status [ref=e185]:
+                        - img [ref=e186]
+        - generic [ref=e188]:
+          - alert [ref=e189]:
+            - img [ref=e191]
+            - generic [ref=e195]:
+              - generic [ref=e196]:
+                - generic [ref=e197]: "Workflows: Now in beta"
+                - generic [ref=e198]:
+                  - text: Orchestrate your agents and background jobs with automatic retries and scale-to-zero.
+                  - link "Learn more" [ref=e199] [cursor=pointer]:
+                    - /url: https://render.com/docs/workflows
+              - link "Create Workflow" [ref=e201] [cursor=pointer]:
+                - /url: /workflow/new
+            - button "Close notification" [ref=e202] [cursor=pointer]:
+              - img [ref=e203]
+          - generic [ref=e205]:
+            - button "Collapse items" [expanded] [ref=e206] [cursor=pointer]:
+              - img [ref=e207]
+            - list "Footer navigation" [ref=e209]:
+              - listitem [ref=e210]:
+                - link "Changelog" [ref=e211] [cursor=pointer]:
+                  - /url: https://render.com/changelog
+                  - img [ref=e212]
+                  - generic [ref=e217]: Changelog
+              - listitem [ref=e218]:
+                - link "Invite a friend" [ref=e219] [cursor=pointer]:
+                  - /url: /invites
+                  - img [ref=e220]
+                  - generic [ref=e222]: Invite a friend
+              - listitem [ref=e223]:
+                - button "Contact support" [ref=e224] [cursor=pointer]:
+                  - img [ref=e225]
+                  - generic [ref=e229]: Contact support
+            - link "Render Status" [ref=e231] [cursor=pointer]:
+              - /url: https://status.render.com
+              - img [ref=e232]
+              - generic [ref=e234]: Render Status
+      - generic [ref=e237]:
+        - img "Loading..." [ref=e238]
+        - generic [ref=e241]: Loading...
+  - generic:
+    - generic:
+      - generic: "0 services selected:"
+      - generic:
+        - generic:
+          - button:
+            - generic:
+              - img
+            - generic: Move
+            - img
+    - generic:
+      - separator
+      - generic:
+        - generic:
+          - button:
+            - img

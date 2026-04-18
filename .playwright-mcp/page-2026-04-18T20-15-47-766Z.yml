@@ -1,0 +1,235 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e2]:
+    - generic [ref=e3]:
+      - banner [ref=e4]:
+        - generic [ref=e5]:
+          - link "Render" [ref=e7] [cursor=pointer]:
+            - /url: /
+            - img "Render" [ref=e8]
+          - button "M My Workspace" [ref=e12] [cursor=pointer]:
+            - generic [ref=e13]:
+              - generic [ref=e14]: M
+              - generic "My Workspace" [ref=e15]
+              - img [ref=e16]
+        - generic [ref=e20]:
+          - navigation [ref=e21]:
+            - list [ref=e22]:
+              - listitem [ref=e23]:
+                - link "Blueprints" [ref=e24] [cursor=pointer]:
+                  - /url: /blueprints
+                  - img [ref=e25]
+                  - generic [ref=e30]: Blueprints
+                - text: /
+              - listitem [ref=e31]:
+                - link "wedding-notification" [ref=e32] [cursor=pointer]:
+                  - /url: /blueprint/exs-d6qu637kijhs73bcv370
+                  - generic [ref=e33]: wedding-notification
+                - button [ref=e36] [cursor=pointer]:
+                  - img [ref=e37]
+          - button "Search Ctrl + K" [ref=e40] [cursor=pointer]:
+            - img [ref=e42]
+            - text: Search
+            - generic [ref=e44]:
+              - img [ref=e45]
+              - generic [ref=e47]: Ctrl
+              - generic [ref=e48]: +
+              - generic [ref=e49]: K
+              - generic [ref=e50]: K
+        - generic [ref=e51]:
+          - button "New" [ref=e53] [cursor=pointer]:
+            - generic [ref=e54]:
+              - img [ref=e55]
+              - generic [ref=e57]: New
+          - button "Upgrade" [ref=e59] [cursor=pointer]:
+            - generic [ref=e60]:
+              - img [ref=e61]
+              - generic [ref=e63]: Upgrade
+          - button "Help" [ref=e65] [cursor=pointer]:
+            - img "Help" [ref=e66]
+          - button "e" [ref=e71] [cursor=pointer]:
+            - generic [ref=e73]: e
+      - generic [ref=e74]:
+        - navigation [ref=e75]:
+          - separator [ref=e76]
+          - generic [ref=e77]:
+            - generic [ref=e78]:
+              - link "Blueprints" [ref=e79] [cursor=pointer]:
+                - /url: /blueprints
+                - img [ref=e80]
+                - generic [ref=e82]: Blueprints
+              - generic [ref=e83]:
+                - img [ref=e84]
+                - generic [ref=e89]: wedding-notification
+            - list [ref=e91]:
+              - listitem [ref=e92]:
+                - link "Resources" [ref=e93] [cursor=pointer]:
+                  - /url: /blueprint/exs-d6qu637kijhs73bcv370/resources
+                  - img [ref=e94]
+                  - generic [ref=e96]: Resources
+              - listitem [ref=e97]:
+                - link "Syncs" [ref=e98] [cursor=pointer]:
+                  - /url: /blueprint/exs-d6qu637kijhs73bcv370/syncs
+                  - img [ref=e99]
+                  - generic [ref=e102]: Syncs
+              - listitem [ref=e103]:
+                - link "Settings" [ref=e104] [cursor=pointer]:
+                  - /url: /blueprint/exs-d6qu637kijhs73bcv370/settings
+                  - img [ref=e105]
+                  - generic [ref=e108]: Settings
+          - generic [ref=e109]:
+            - alert [ref=e110]:
+              - img [ref=e112]
+              - generic [ref=e116]:
+                - generic [ref=e117]:
+                  - generic [ref=e118]: "Workflows: Now in beta"
+                  - generic [ref=e119]:
+                    - text: Orchestrate your agents and background jobs with automatic retries and scale-to-zero.
+                    - link "Learn more" [ref=e120] [cursor=pointer]:
+                      - /url: https://render.com/docs/workflows
+                - link "Create Workflow" [ref=e122] [cursor=pointer]:
+                  - /url: /workflow/new
+              - button "Close notification" [ref=e123] [cursor=pointer]:
+                - img [ref=e124]
+            - generic [ref=e126]:
+              - button "Collapse items" [expanded] [ref=e127] [cursor=pointer]:
+                - img [ref=e128]
+              - list "Footer navigation" [ref=e130]:
+                - listitem [ref=e131]:
+                  - link "Changelog" [ref=e132] [cursor=pointer]:
+                    - /url: https://render.com/changelog
+                    - img [ref=e133]
+                    - generic [ref=e138]: Changelog
+                - listitem [ref=e139]:
+                  - link "Invite a friend" [ref=e140] [cursor=pointer]:
+                    - /url: /invites
+                    - img [ref=e141]
+                    - generic [ref=e143]: Invite a friend
+                - listitem [ref=e144]:
+                  - button "Contact support" [ref=e145] [cursor=pointer]:
+                    - img [ref=e146]
+                    - generic [ref=e150]: Contact support
+              - link "Render Status" [ref=e152] [cursor=pointer]:
+                - /url: https://status.render.com
+                - img [ref=e153]
+                - generic [ref=e155]: Render Status
+        - generic [ref=e157]:
+          - banner [ref=e159]:
+            - generic [ref=e160]:
+              - generic [ref=e161]:
+                - img [ref=e162]
+                - generic [ref=e167]: Blueprint
+              - generic [ref=e168]:
+                - heading "wedding-notification" [level=1] [ref=e170]:
+                  - generic [ref=e171]: wedding-notification
+                - button "Manual sync" [ref=e173] [cursor=pointer]:
+                  - text: Manual sync
+                  - img [ref=e175]
+            - generic [ref=e180]:
+              - generic [ref=e182]:
+                - generic [ref=e183]: "Blueprint ID:"
+                - generic "Blueprint ID:" [ref=e184]:
+                  - generic [ref=e185]: exs-d6qu637kijhs73bcv370
+                  - button "Copy" [ref=e188] [cursor=pointer]:
+                    - img [ref=e189]
+              - generic [ref=e192]:
+                - img "GitHub" [ref=e194]
+                - link "elad-refoua / wedding-notification master" [ref=e196] [cursor=pointer]:
+                  - /url: https://github.com/elad-refoua/wedding-notification/tree/master
+                  - generic [ref=e197]:
+                    - generic [ref=e198]: elad-refoua / wedding-notification
+                    - img [ref=e199]
+                    - generic [ref=e201]: master
+          - main [ref=e202]:
+            - generic [ref=e203]:
+              - generic [ref=e205]:
+                - heading "Settings" [level=4] [ref=e210]
+                - generic [ref=e212]:
+                  - generic [ref=e213]:
+                    - generic [ref=e214]:
+                      - generic [ref=e216]: Blueprint Name
+                      - generic [ref=e217]: A unique name for your Blueprint.
+                    - generic [ref=e220]:
+                      - textbox "Blueprint Name" [ref=e223]: wedding-notification
+                      - button "Edit" [ref=e225] [cursor=pointer]:
+                        - img [ref=e227]
+                        - text: Edit
+                  - generic [ref=e230]:
+                    - generic [ref=e231]:
+                      - generic [ref=e233]: Auto Sync
+                      - generic [ref=e234]: Automatically sync changes to your Blueprint file? Select "No" to handle syncs manually.
+                    - generic [ref=e237]:
+                      - generic [ref=e238]:
+                        - generic [ref=e239]: autoSync
+                        - button "autoSync Yes" [disabled] [ref=e241]:
+                          - generic [ref=e243]: "Yes"
+                          - img [ref=e244]
+                      - button "Edit" [ref=e247] [cursor=pointer]:
+                        - img [ref=e249]
+                        - text: Edit
+                  - generic [ref=e252]:
+                    - generic [ref=e253]:
+                      - generic [ref=e255]: Sync Hook
+                      - generic [ref=e256]: Your private URL to trigger a sync for this Blueprint. Remember to keep this a secret.
+                    - generic [ref=e259]:
+                      - textbox "Sync Hook" [ref=e260]: https://api.render.com/sync/exs-d6qu637kijhs73bcv370?key=BEB7Hdo435E
+                      - generic [ref=e261]:
+                        - button "Show secret" [ref=e262] [cursor=pointer]:
+                          - img [ref=e263]
+                        - button "Copy" [ref=e266] [cursor=pointer]:
+                          - img [ref=e267]
+                  - generic [ref=e270]:
+                    - generic [ref=e271]:
+                      - generic [ref=e273]: Branch
+                      - generic [ref=e274]: The Git branch to build and deploy.
+                    - generic [ref=e277]:
+                      - combobox [ref=e278]:
+                        - generic [ref=e280]:
+                          - generic [ref=e281]: Branch
+                          - generic [ref=e282]:
+                            - img
+                            - textbox "Branch" [ref=e283]:
+                              - /placeholder: Search
+                              - text: master
+                      - button "Edit" [ref=e285] [cursor=pointer]:
+                        - img [ref=e287]
+                        - text: Edit
+                  - generic [ref=e290]:
+                    - generic [ref=e291]:
+                      - generic [ref=e293]: Blueprint Path
+                      - generic [ref=e294]:
+                        - text: The path to the Blueprint file in your repo (e.g.,
+                        - code [ref=e295]: infra/render.yaml
+                        - text: ). Defaults to
+                        - code [ref=e296]: render.yaml
+                        - text: at the root of your repository.
+                    - generic [ref=e299]:
+                      - textbox "Blueprint Path" [ref=e302]: render.yaml
+                      - button "Edit" [ref=e304] [cursor=pointer]:
+                        - img [ref=e306]
+                        - text: Edit
+                  - generic [ref=e309]:
+                    - generic [ref=e310]:
+                      - generic [ref=e312]: Git Credentials
+                      - generic [ref=e313]: User providing the credentials to pull the repository.
+                    - generic [ref=e314]:
+                      - textbox "Git Credentials" [ref=e317]: eladrefoua@gmail.com (you)
+                      - button "Use My Credentials" [disabled] [ref=e319]
+              - button "Disconnect Blueprint" [ref=e321] [cursor=pointer]
+    - generic:
+      - generic:
+        - generic: "0 services selected:"
+        - generic:
+          - generic:
+            - button:
+              - generic:
+                - img
+              - generic: Move
+              - img
+      - generic:
+        - separator
+        - generic:
+          - generic:
+            - button:
+              - img
+  - iframe [ref=e322]:
+    

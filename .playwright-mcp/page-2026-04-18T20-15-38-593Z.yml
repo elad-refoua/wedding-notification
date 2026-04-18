@@ -1,0 +1,131 @@
+- generic [ref=e2]:
+  - generic [ref=e3]:
+    - banner [ref=e4]:
+      - generic [ref=e5]:
+        - link "Render" [ref=e7] [cursor=pointer]:
+          - /url: /
+          - img "Render" [ref=e8]
+        - button "M My Workspace" [ref=e12] [cursor=pointer]:
+          - generic [ref=e13]:
+            - generic [ref=e14]: M
+            - generic "My Workspace" [ref=e15]
+            - img [ref=e16]
+      - generic [ref=e20]:
+        - navigation [ref=e21]:
+          - list [ref=e22]:
+            - listitem [ref=e23]:
+              - link "Blueprints" [ref=e24] [cursor=pointer]:
+                - /url: /blueprints
+                - img [ref=e25]
+                - generic [ref=e30]: Blueprints
+              - text: /
+            - listitem [ref=e31]:
+              - button "wedding-notification" [ref=e34] [cursor=pointer]:
+                - generic [ref=e36]:
+                  - generic [ref=e37]: wedding-notification
+                  - img [ref=e38]
+        - button "Search Ctrl + K" [ref=e41] [cursor=pointer]:
+          - img [ref=e43]
+          - text: Search
+          - generic [ref=e45]:
+            - img [ref=e46]
+            - generic [ref=e48]: Ctrl
+            - generic [ref=e49]: +
+            - generic [ref=e50]: K
+            - generic [ref=e51]: K
+      - generic [ref=e52]:
+        - button "New" [ref=e54] [cursor=pointer]:
+          - generic [ref=e55]:
+            - img [ref=e56]
+            - generic [ref=e58]: New
+        - button "Upgrade" [ref=e60] [cursor=pointer]:
+          - generic [ref=e61]:
+            - img [ref=e62]
+            - generic [ref=e64]: Upgrade
+        - button "Help" [ref=e66] [cursor=pointer]:
+          - img "Help" [ref=e67]
+        - button "e" [ref=e72] [cursor=pointer]:
+          - generic [ref=e74]: e
+    - generic [ref=e75]:
+      - navigation [ref=e76]:
+        - separator [ref=e77]
+        - generic [ref=e78]:
+          - generic [ref=e79]:
+            - link "Blueprints" [ref=e80] [cursor=pointer]:
+              - /url: /blueprints
+              - img [ref=e81]
+              - generic [ref=e83]: Blueprints
+            - generic [ref=e84]:
+              - img [ref=e85]
+              - generic [ref=e90]: wedding-notification
+          - list [ref=e92]:
+            - listitem [ref=e93]:
+              - link "Resources" [ref=e94] [cursor=pointer]:
+                - /url: /blueprint/exs-d6qu637kijhs73bcv370/resources
+                - img [ref=e95]
+                - generic [ref=e97]: Resources
+            - listitem [ref=e98]:
+              - link "Syncs" [ref=e99] [cursor=pointer]:
+                - /url: /blueprint/exs-d6qu637kijhs73bcv370/syncs
+                - img [ref=e100]
+                - generic [ref=e103]: Syncs
+            - listitem [ref=e104]:
+              - link "Settings" [ref=e105] [cursor=pointer]:
+                - /url: /blueprint/exs-d6qu637kijhs73bcv370/settings
+                - img [ref=e106]
+                - generic [ref=e109]: Settings
+        - generic [ref=e110]:
+          - alert [ref=e111]:
+            - img [ref=e113]
+            - generic [ref=e117]:
+              - generic [ref=e118]:
+                - generic [ref=e119]: "Workflows: Now in beta"
+                - generic [ref=e120]:
+                  - text: Orchestrate your agents and background jobs with automatic retries and scale-to-zero.
+                  - link "Learn more" [ref=e121] [cursor=pointer]:
+                    - /url: https://render.com/docs/workflows
+              - link "Create Workflow" [ref=e123] [cursor=pointer]:
+                - /url: /workflow/new
+            - button "Close notification" [ref=e124] [cursor=pointer]:
+              - img [ref=e125]
+          - generic [ref=e127]:
+            - button "Collapse items" [expanded] [ref=e128] [cursor=pointer]:
+              - img [ref=e129]
+            - list "Footer navigation" [ref=e131]:
+              - listitem [ref=e132]:
+                - link "Changelog" [ref=e133] [cursor=pointer]:
+                  - /url: https://render.com/changelog
+                  - img [ref=e134]
+                  - generic [ref=e139]: Changelog
+              - listitem [ref=e140]:
+                - link "Invite a friend" [ref=e141] [cursor=pointer]:
+                  - /url: /invites
+                  - img [ref=e142]
+                  - generic [ref=e144]: Invite a friend
+              - listitem [ref=e145]:
+                - button "Contact support" [ref=e146] [cursor=pointer]:
+                  - img [ref=e147]
+                  - generic [ref=e151]: Contact support
+            - link "Render Status" [ref=e153] [cursor=pointer]:
+              - /url: https://status.render.com
+              - img [ref=e154]
+              - generic [ref=e156]: Render Status
+      - generic [ref=e159]:
+        - img "Loading..." [ref=e160]
+        - generic [ref=e163]: Loading...
+  - generic:
+    - generic:
+      - generic: "0 services selected:"
+      - generic:
+        - generic:
+          - button:
+            - generic:
+              - img
+            - generic: Move
+            - img
+    - generic:
+      - separator
+      - generic:
+        - generic:
+          - button:
+            - img
