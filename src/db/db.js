@@ -34,9 +34,9 @@ function runMigrations(d) {
     d.prepare("ALTER TABLE guests ADD COLUMN reminders_paused INTEGER DEFAULT 0").run();
   }
 
-  // SQLite cannot alter FK constraints in-place. If the messages or reminders table was
-  // created before we added ON DELETE CASCADE, rebuild it (SQLite-recommended pattern:
-  // CREATE new → COPY → DROP old → RENAME). Detect by probing foreign_key_list.
+  // SQLite cannot alter FK constraints in-place. Rebuild messages/reminders tables if they
+  // were created before we added ON DELETE CASCADE. Rebuild guests if the CHECK constraint
+  // on `side` still lacks 'both'. Detect both via introspection.
   maybeRebuildForCascade(d, 'messages', `
     CREATE TABLE messages_new (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,6 +60,54 @@ function runMigrations(d) {
       status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'cancelled'))
     )
   `);
+
+  maybeRebuildGuestsForBoth(d);
+}
+
+// Rebuild the guests table if its `side` CHECK constraint doesn't allow 'both' yet.
+// The previous CHECK was ('groom','bride'); new schema adds 'both'. SQLite has no "ALTER
+// CHECK" — must rebuild the table.
+function maybeRebuildGuestsForBoth(d) {
+  const rawSql = d.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='guests'").get();
+  if (!rawSql || !rawSql.sql) return;
+  if (rawSql.sql.includes("'both'")) return; // already migrated
+  d.prepare('PRAGMA foreign_keys = OFF').run();
+  try {
+    const txn = d.transaction(() => {
+      d.prepare(`
+        CREATE TABLE guests_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          name TEXT NOT NULL,
+          phone TEXT NOT NULL UNIQUE,
+          side TEXT CHECK(side IN ('groom', 'bride', 'both')),
+          group_name TEXT,
+          num_invited INTEGER DEFAULT 1,
+          num_coming INTEGER DEFAULT 0,
+          status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'invited', 'coming', 'not_coming', 'undecided', 'opted_out')),
+          notes TEXT,
+          reminders_paused INTEGER DEFAULT 0,
+          created_at DATETIME DEFAULT (datetime('now')),
+          updated_at DATETIME DEFAULT (datetime('now'))
+        )
+      `).run();
+      const oldCols = d.prepare("PRAGMA table_info(guests)").all().map(c => c.name);
+      const newCols = d.prepare("PRAGMA table_info(guests_new)").all().map(c => c.name);
+      const shared = oldCols.filter(c => newCols.includes(c)).join(', ');
+      d.prepare(`INSERT INTO guests_new (${shared}) SELECT ${shared} FROM guests`).run();
+      // The guests_updated_at trigger references OLD guests table — drop and recreate after rename.
+      d.prepare(`DROP TRIGGER IF EXISTS guests_updated_at`).run();
+      d.prepare(`DROP TABLE guests`).run();
+      d.prepare(`ALTER TABLE guests_new RENAME TO guests`).run();
+      d.prepare(`
+        CREATE TRIGGER guests_updated_at AFTER UPDATE ON guests FOR EACH ROW
+        BEGIN UPDATE guests SET updated_at = datetime('now') WHERE id = OLD.id; END
+      `).run();
+      console.log("Migrated guests — added 'both' to side CHECK constraint");
+    });
+    txn();
+  } finally {
+    d.prepare('PRAGMA foreign_keys = ON').run();
+  }
 }
 
 function maybeRebuildForCascade(d, tableName, createNewSQL) {
