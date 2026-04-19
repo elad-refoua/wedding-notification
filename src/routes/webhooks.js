@@ -123,28 +123,45 @@ function checkMilestone(db) {
   }
 }
 
-// SMS webhooks
-router.post('/sms', twilioAuth, (req, res) => { return handleIncoming(req, res, 'sms'); });
-router.post('/sms/status', twilioAuth, (req, res) => {
+function updateStatusFromCallback(req) {
   const db = getDb();
   const sid = req.body.MessageSid;
   const status = req.body.MessageStatus;
-  if (sid && status) {
+  if (!sid || !status) return;
+  const errorCode = req.body.ErrorCode;
+  const errorMessage = req.body.ErrorMessage;
+  // For failed/undelivered, record Twilio's error code + a Hebrew-friendly hint so it shows in the dashboard
+  if ((status === 'failed' || status === 'undelivered') && (errorCode || errorMessage)) {
+    const detail = '[' + (errorCode || '?') + '] ' + (errorMessage || '') + ' ' + hebrewHint(errorCode);
+    db.prepare('UPDATE messages SET status = ?, error = COALESCE(NULLIF(?, \'\'), error) WHERE twilio_sid = ?').run(status, detail.trim(), sid);
+  } else {
     db.prepare('UPDATE messages SET status = ? WHERE twilio_sid = ?').run(status, sid);
   }
-  twimlResponse(res);
-});
+}
+
+// Short Hebrew explanation for common Twilio error codes so the dashboard shows a hint alongside the raw code
+function hebrewHint(code) {
+  const hints = {
+    '21608': '— שדר את Twilio מהניסיון (Trial). מספרים לא מאומתים לא יקבלו.',
+    '21211': '— מספר הטלפון של היעד שגוי או לא תקני.',
+    '21610': '— המספר ביטל מנוי ("STOP"). צריך שישלח "חידוש" כדי לחזור.',
+    '63007': '— סנדבוקס WhatsApp: הנמען לא הצטרף. שלח "join getting-film" ל-+14155238886 ואז נסה שוב.',
+    '63015': '— סנדבוקס WhatsApp: הנמען לא הצטרף. שלח "join getting-film" ל-+14155238886 ואז נסה שוב.',
+    '63016': '— הודעה מסוג טקסט חופשי בוואטסאפ נשלחה מחוץ לחלון של 24 שעות. צריכה להיות תבנית מאושרת של מטא.',
+    '63018': '— מגבלת קצב של הערוץ הזה מול WhatsApp נחצתה. המתן וחזור.',
+    '30003': '— מספר הטלפון של היעד לא מחובר או לא זמין.',
+    '30004': '— היעד חסום להודעות.',
+    '30005': '— מספר הטלפון של היעד לא קיים.'
+  };
+  return hints[String(code)] || '';
+}
+
+// SMS webhooks
+router.post('/sms', twilioAuth, (req, res) => { return handleIncoming(req, res, 'sms'); });
+router.post('/sms/status', twilioAuth, (req, res) => { updateStatusFromCallback(req); twimlResponse(res); });
 
 // WhatsApp webhooks
 router.post('/whatsapp', twilioAuth, (req, res) => { return handleIncoming(req, res, 'whatsapp'); });
-router.post('/whatsapp/status', twilioAuth, (req, res) => {
-  const db = getDb();
-  const sid = req.body.MessageSid;
-  const status = req.body.MessageStatus;
-  if (sid && status) {
-    db.prepare('UPDATE messages SET status = ? WHERE twilio_sid = ?').run(status, sid);
-  }
-  twimlResponse(res);
-});
+router.post('/whatsapp/status', twilioAuth, (req, res) => { updateStatusFromCallback(req); twimlResponse(res); });
 
 module.exports = router;

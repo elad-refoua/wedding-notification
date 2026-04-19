@@ -127,23 +127,57 @@
       }
     }
 
+    const STATUS_LABEL = {
+      sent: '✓ נשלח',
+      delivered: '✓✓ נמסר',
+      read: '✓✓ נקרא',
+      failed: '✗ נכשל',
+      undelivered: '✗ לא נמסר',
+      received: '💬 תשובה'
+    };
+    const STATUS_COLOR = {
+      sent: '#4ade80', delivered: '#22c55e', read: '#16a34a',
+      failed: '#f87171', undelivered: '#f87171', received: '#0ea5e9'
+    };
+
+    function addStat(container, color, text) {
+      var span = document.createElement('span');
+      span.style.color = color;
+      span.textContent = text;
+      container.appendChild(span);
+    }
+
     async function loadActivity() {
       try {
-        const msgs = await api('/messages?limit=20');
+        const data = await api('/activity?limit=20');
         const feed = document.getElementById('activityFeed');
-        if (!msgs.length) {
-          feed.textContent = '';
+        feed.textContent = '';
+
+        var statsLine = document.createElement('div');
+        statsLine.style.cssText = 'display:flex; gap:1.5rem; padding:0.5rem 0.75rem; background:#0f172a; border-radius:6px; margin-bottom:0.75rem; font-size:0.85rem;';
+        addStat(statsLine, '#4ade80', '✓ ' + data.counts.outgoing_sent + ' נשלחו');
+        addStat(statsLine, '#f87171', '✗ ' + data.counts.outgoing_failed + ' נכשלו');
+        addStat(statsLine, '#0ea5e9', '💬 ' + data.counts.incoming + ' תשובות');
+        var totalSpan = document.createElement('span');
+        totalSpan.style.cssText = 'color:#64748b; margin-right:auto;';
+        totalSpan.textContent = data.counts.total + ' סה"כ';
+        statsLine.appendChild(totalSpan);
+        feed.appendChild(statsLine);
+
+        if (!data.rows.length) {
           const empty = document.createElement('div');
           empty.className = 'empty-state';
-          empty.textContent = 'אין פעילות עדיין';
+          empty.textContent = 'אין פעילות עדיין. לחץ "שלח הזמנות" כדי להתחיל.';
           feed.appendChild(empty);
           return;
         }
-        // Build feed items using safe DOM methods
-        feed.textContent = '';
-        msgs.forEach(function(m) {
+
+        data.rows.forEach(function(m) {
           var item = document.createElement('div');
           item.className = 'feed-item';
+          item.style.borderRight = '3px solid ' + (STATUS_COLOR[m.status] || '#334155');
+          item.style.paddingRight = '0.75rem';
+          item.style.marginBottom = '0.5rem';
 
           var time = document.createElement('span');
           time.className = 'feed-time';
@@ -153,19 +187,15 @@
           var text = document.createElement('span');
           text.className = 'feed-text';
 
-          // Direction badge
-          var dirBadge = document.createElement('span');
-          dirBadge.className = m.direction === 'outgoing' ? 'badge badge-info' : 'badge badge-warning';
-          dirBadge.style.fontSize = '0.7rem';
-          dirBadge.style.marginLeft = '0.4rem';
-          dirBadge.textContent = m.direction === 'outgoing' ? 'נשלח' : 'התקבל';
-          text.appendChild(dirBadge);
+          var statBadge = document.createElement('span');
+          statBadge.className = 'badge';
+          statBadge.style.cssText = 'font-size:0.7rem; margin-left:0.4rem; background:#1e293b; color:' + (STATUS_COLOR[m.status] || '#cbd5e1');
+          statBadge.textContent = STATUS_LABEL[m.status] || m.status;
+          text.appendChild(statBadge);
 
-          // Channel badge
           var chBadge = document.createElement('span');
-          chBadge.className = m.channel === 'whatsapp' ? 'badge badge-success' : 'badge badge-secondary';
-          chBadge.style.fontSize = '0.65rem';
-          chBadge.style.marginLeft = '0.4rem';
+          chBadge.className = 'badge';
+          chBadge.style.cssText = 'font-size:0.65rem; margin-left:0.4rem; background:' + (m.channel === 'whatsapp' ? '#166534' : '#334155') + '; color:#fff;';
           chBadge.textContent = m.channel === 'whatsapp' ? 'WA' : 'SMS';
           text.appendChild(chBadge);
 
@@ -173,22 +203,38 @@
           strong.textContent = ' ' + (m.guest_name || 'לא ידוע');
           text.appendChild(strong);
 
-          var sep = document.createTextNode(': ');
-          text.appendChild(sep);
-
-          var body = m.content || '';
-          var bodyText = document.createTextNode(body.length > 80 ? body.substring(0, 80) + '...' : body);
-          text.appendChild(bodyText);
+          if (m.content) {
+            var body = m.content || '';
+            var bodyText = document.createTextNode(': ' + (body.length > 80 ? body.substring(0, 80) + '...' : body));
+            text.appendChild(bodyText);
+          }
 
           item.appendChild(text);
+
+          if ((m.status === 'failed' || m.status === 'undelivered') && m.error) {
+            var err = document.createElement('div');
+            err.style.cssText = 'font-size:0.8rem; color:#fca5a5; margin-top:0.25rem; padding-right:1.2rem;';
+            err.textContent = 'סיבה: ' + m.error;
+            item.appendChild(err);
+          }
+
           feed.appendChild(item);
         });
+
+        var linkAll = document.createElement('div');
+        linkAll.style.cssText = 'margin-top:0.75rem; text-align:center;';
+        var link = document.createElement('a');
+        link.href = 'messages.html';
+        link.style.color = '#0ea5e9';
+        link.textContent = 'הצג פעילות מלאה →';
+        linkAll.appendChild(link);
+        feed.appendChild(linkAll);
       } catch (e) {
         var feed = document.getElementById('activityFeed');
         feed.textContent = '';
         var empty = document.createElement('div');
         empty.className = 'empty-state';
-        empty.textContent = 'שגיאה בטעינת פעילות';
+        empty.textContent = 'שגיאה בטעינת פעילות: ' + e.message;
         feed.appendChild(empty);
       }
     }
@@ -199,7 +245,7 @@
 
     document.addEventListener('DOMContentLoaded', function() {
       refresh();
-      setInterval(refresh, 30000);
+      setInterval(refresh, 5000);
     });
   </script>
 </body>

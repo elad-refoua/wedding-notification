@@ -206,6 +206,61 @@ router.post('/preview-invitation', (req, res) => {
   });
 });
 
+// POST /api/backfill-errors — for any outgoing message with status='failed' and empty error,
+// fetch the Twilio Message record and record error_code/error_message. Safe to call repeatedly.
+router.post('/backfill-errors', async (req, res) => {
+  const db = getDb();
+  const twilio = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+  const rows = db.prepare("SELECT id, twilio_sid FROM messages WHERE status IN ('failed','undelivered') AND (error IS NULL OR error = '') AND twilio_sid IS NOT NULL").all();
+  let updated = 0, skipped = 0;
+  const { getSetting } = require('../db/db');
+  const hints = { '21608': 'שדר Twilio Trial — מספרים לא מאומתים נחסמים.', '63007': 'WhatsApp Sandbox: הנמען לא שלח "join getting-film" ל-+14155238886.', '63015': 'WhatsApp Sandbox: הנמען לא שלח "join getting-film" ל-+14155238886.', '21211': 'מספר היעד לא תקני.', '21610': 'הנמען ביטל מנוי ("STOP").', '63016': 'הודעת טקסט חופשי מחוץ לחלון 24 שעות — חובה תבנית מאושרת.' };
+  for (const r of rows) {
+    try {
+      const m = await twilio.messages(r.twilio_sid).fetch();
+      const detail = (m.errorCode ? '[' + m.errorCode + '] ' : '') + (m.errorMessage || '') + (hints[String(m.errorCode)] ? ' — ' + hints[String(m.errorCode)] : '');
+      if (detail.trim()) {
+        db.prepare('UPDATE messages SET error = ? WHERE id = ?').run(detail.trim(), r.id);
+        updated++;
+      } else { skipped++; }
+    } catch (e) { skipped++; }
+  }
+  res.json({ updated, skipped, scanned: rows.length });
+});
+
+// GET /api/activity — unified chronological activity feed (sends, replies, status updates).
+// Enriched with guest name. Ordered newest-first. Supports `since` param (ISO) for incremental polling.
+router.get('/activity', (req, res) => {
+  const db = getDb();
+  const limit = Math.min(parseInt(req.query.limit) || 100, 500);
+  let sql = 'SELECT m.*, g.name as guest_name, g.status as guest_status FROM messages m LEFT JOIN guests g ON m.guest_id = g.id';
+  const params = [];
+  if (req.query.since) { sql += ' WHERE m.created_at > ?'; params.push(req.query.since); }
+  sql += ' ORDER BY m.created_at DESC LIMIT ?';
+  params.push(limit);
+  const rows = db.prepare(sql).all(...params);
+  res.json({
+    rows,
+    server_time: new Date().toISOString(),
+    counts: {
+      total: db.prepare('SELECT COUNT(*) as c FROM messages').get().c,
+      outgoing_sent: db.prepare("SELECT COUNT(*) as c FROM messages WHERE direction='outgoing' AND status IN ('sent','delivered','read')").get().c,
+      outgoing_failed: db.prepare("SELECT COUNT(*) as c FROM messages WHERE direction='outgoing' AND status IN ('failed','undelivered')").get().c,
+      incoming: db.prepare("SELECT COUNT(*) as c FROM messages WHERE direction='incoming'").get().c
+    }
+  });
+});
+
+// GET /api/guest/:id/timeline — full per-guest message history, chronological oldest-first
+router.get('/guests/:id/timeline', (req, res) => {
+  const db = getDb();
+  const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(req.params.id);
+  if (!guest) return res.status(404).json({ error: 'Guest not found' });
+  const messages = db.prepare("SELECT * FROM messages WHERE guest_id = ? ORDER BY created_at ASC").all(req.params.id);
+  const reminders = db.prepare("SELECT * FROM reminders WHERE guest_id = ? ORDER BY scheduled_at ASC").all(req.params.id);
+  res.json({ guest, messages, reminders });
+});
+
 // POST /api/import-paste — import guests from pasted "name, phone, side, group" lines
 router.post('/import-paste', (req, res) => {
   try {

@@ -3,15 +3,46 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ניהול חתונה — הודעות</title>
+  <title>ניהול חתונה — פעילות מלאה</title>
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    .activity-counts { display:flex; gap:0.75rem; flex-wrap:wrap; margin-bottom:1rem; }
+    .count-card { background:#1e293b; padding:0.75rem 1rem; border-radius:8px; flex:1; min-width:140px; }
+    .count-card .n { font-size:1.6rem; font-weight:bold; color:#f1f5f9; }
+    .count-card .lbl { color:#94a3b8; font-size:0.8rem; margin-top:0.25rem; }
+    .count-card.ok .n { color:#4ade80; }
+    .count-card.fail .n { color:#f87171; }
+    .count-card.in .n { color:#0ea5e9; }
+    .evt-row { background:#1e293b; padding:0.75rem; border-radius:8px; margin-bottom:0.5rem; border-right:3px solid transparent; }
+    .evt-row.sent { border-right-color:#4ade80; }
+    .evt-row.delivered { border-right-color:#22c55e; }
+    .evt-row.read { border-right-color:#16a34a; }
+    .evt-row.failed, .evt-row.undelivered { border-right-color:#f87171; background:#2a1f1f; }
+    .evt-row.received { border-right-color:#0ea5e9; background:#172033; }
+    .evt-head { display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap; }
+    .evt-name { font-weight:bold; color:#f1f5f9; }
+    .evt-time { color:#64748b; font-size:0.8rem; }
+    .evt-badge { padding:0.15rem 0.5rem; border-radius:4px; font-size:0.75rem; }
+    .evt-chan-whatsapp { background:#166534; color:#dcfce7; }
+    .evt-chan-sms { background:#334155; color:#cbd5e1; }
+    .evt-status-sent { background:#1e293b; color:#4ade80; }
+    .evt-status-delivered { background:#14532d; color:#bbf7d0; }
+    .evt-status-read { background:#15803d; color:#f0fdf4; }
+    .evt-status-failed, .evt-status-undelivered { background:#7f1d1d; color:#fecaca; }
+    .evt-status-received { background:#0c4a6e; color:#bae6fd; }
+    .evt-body { margin-top:0.5rem; color:#cbd5e1; font-size:0.9rem; white-space:pre-wrap; max-width:700px; }
+    .evt-err { margin-top:0.5rem; padding:0.5rem; background:#450a0a; border-radius:4px; color:#fca5a5; font-size:0.85rem; }
+    .auto-refresh { color:#64748b; font-size:0.8rem; display:flex; align-items:center; gap:0.5rem; }
+    .live-dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:#4ade80; animation:pulse 2s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.3; } }
+  </style>
 </head>
 <body>
   <nav>
     <span class="brand">💍 ניהול חתונה</span>
     <a href="index.html">בית</a>
     <a href="guests.html">אורחים</a>
-    <a href="messages.html">הודעות</a>
+    <a href="messages.html">פעילות</a>
     <a href="reminders.html">תזכורות</a>
     <a href="settings.html">הגדרות</a>
     <a href="export.html">ייצוא</a>
@@ -20,139 +51,209 @@
   </nav>
 
   <div class="container">
-    <h1 class="page-title">יומן הודעות</h1>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:1rem;">
+      <h1 class="page-title">פעילות מלאה (יומן)</h1>
+      <div class="auto-refresh">
+        <span class="live-dot"></span>
+        <span>מתרענן אוטומטית כל 5 שניות</span>
+        <button class="btn btn-secondary" onclick="loadActivity()" id="refreshBtn" style="margin-right:0.5rem;">רענן עכשיו</button>
+        <button class="btn btn-secondary" onclick="backfillErrors()" id="backfillBtn" title="שולף מ-Twilio את סיבות הכשלון של הודעות ישנות שעוד לא היו מפוענחות">משוך שגיאות</button>
+      </div>
+    </div>
 
-    <!-- Filters -->
+    <div class="activity-counts" id="counts">
+      <div class="count-card ok"><div class="n" id="cntSent">—</div><div class="lbl">נשלחו / התקבלו</div></div>
+      <div class="count-card fail"><div class="n" id="cntFail">—</div><div class="lbl">נכשלו</div></div>
+      <div class="count-card in"><div class="n" id="cntIn">—</div><div class="lbl">תשובות נכנסות</div></div>
+      <div class="count-card"><div class="n" id="cntTotal">—</div><div class="lbl">סך כל האירועים</div></div>
+    </div>
+
     <div class="filter-row">
       <div class="form-group">
         <label>כיוון</label>
         <select id="filterDirection">
           <option value="">הכל</option>
-          <option value="incoming">נכנס</option>
-          <option value="outgoing">יוצא</option>
+          <option value="outgoing">יוצא (אנחנו שלחנו)</option>
+          <option value="incoming">נכנס (אורח השיב)</option>
         </select>
       </div>
       <div class="form-group">
         <label>ערוץ</label>
         <select id="filterChannel">
           <option value="">הכל</option>
-          <option value="sms">SMS</option>
           <option value="whatsapp">WhatsApp</option>
+          <option value="sms">SMS</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>סטטוס</label>
+        <select id="filterStatus">
+          <option value="">הכל</option>
+          <option value="ok">הצליחו (נשלחו/נמסרו/נקראו)</option>
+          <option value="failed">נכשלו</option>
+          <option value="received">תשובה נכנסה</option>
         </select>
       </div>
     </div>
 
-    <!-- Table -->
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>זמן</th>
-            <th>אורח</th>
-            <th>כיוון</th>
-            <th>ערוץ</th>
-            <th>תוכן</th>
-            <th>סטטוס</th>
-          </tr>
-        </thead>
-        <tbody id="messagesBody">
-          <tr><td colspan="6" class="empty-state"><span class="spinner"></span> טוען...</td></tr>
-        </tbody>
-      </table>
+    <div id="activityList">
+      <div class="empty-state"><span class="spinner"></span> טוען...</div>
+    </div>
+
+    <div id="statusBar" style="margin-top:1rem; padding:0.75rem; background:#1e293b; border-radius:8px; color:#94a3b8; font-size:0.85rem;">
+      עדכון אחרון: <span id="lastUpdate">—</span>
     </div>
   </div>
 
   <script src="js/app.js"></script>
   <script>
-    // NOTE: All dynamic content built with safe DOM methods (textContent, createElement).
-    // This is a local admin dashboard behind auth middleware.
-    async function loadMessages() {
+    let autoRefreshInterval = null;
+    let lastRowCount = 0;
+
+    const CHANNEL_LABEL = { whatsapp: 'WhatsApp', sms: 'SMS' };
+    const DIRECTION_LABEL = { outgoing: '🡐 יוצא', incoming: '🡒 נכנס' };
+    const STATUS_LABEL = {
+      sent: 'נשלח (התקבל ב-Twilio)',
+      delivered: 'נמסר למכשיר',
+      read: 'נקרא ע"י הנמען',
+      failed: 'נכשל',
+      undelivered: 'לא נמסר',
+      received: 'תשובה התקבלה'
+    };
+
+    function fmtTime(iso) {
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      const diffMin = Math.round((Date.now() - d.getTime()) / 60000);
+      if (diffMin < 1) return 'עכשיו';
+      if (diffMin < 60) return 'לפני ' + diffMin + ' דקות';
+      if (diffMin < 60 * 24) return 'לפני ' + Math.round(diffMin / 60) + ' שעות';
+      return d.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem' });
+    }
+
+    function matchesFilter(r) {
+      const dir = document.getElementById('filterDirection').value;
+      const ch = document.getElementById('filterChannel').value;
+      const st = document.getElementById('filterStatus').value;
+      if (dir && r.direction !== dir) return false;
+      if (ch && r.channel !== ch) return false;
+      if (st === 'ok' && !['sent','delivered','read'].includes(r.status)) return false;
+      if (st === 'failed' && !['failed','undelivered'].includes(r.status)) return false;
+      if (st === 'received' && r.status !== 'received') return false;
+      return true;
+    }
+
+    async function loadActivity() {
       try {
-        var params = new URLSearchParams();
-        var direction = document.getElementById('filterDirection').value;
-        var channel = document.getElementById('filterChannel').value;
-        if (direction) params.set('direction', direction);
-        if (channel) params.set('channel', channel);
+        const data = await api('/activity?limit=200');
+        document.getElementById('cntSent').textContent = data.counts.outgoing_sent;
+        document.getElementById('cntFail').textContent = data.counts.outgoing_failed;
+        document.getElementById('cntIn').textContent = data.counts.incoming;
+        document.getElementById('cntTotal').textContent = data.counts.total;
+        document.getElementById('lastUpdate').textContent = new Date().toLocaleTimeString('he-IL');
 
-        var messages = await api('/messages?' + params.toString());
-        var tbody = document.getElementById('messagesBody');
-        tbody.textContent = '';
+        const rows = data.rows.filter(matchesFilter);
+        const container = document.getElementById('activityList');
+        container.textContent = '';
 
-        if (!messages.length) {
-          var tr = document.createElement('tr');
-          var td = document.createElement('td');
-          td.colSpan = 6;
-          td.className = 'empty-state';
-          td.textContent = 'אין הודעות להצגה';
-          tr.appendChild(td);
-          tbody.appendChild(tr);
+        if (!rows.length) {
+          const e = document.createElement('div');
+          e.className = 'empty-state';
+          e.textContent = 'אין אירועים תואמים. כשתשלח הזמנות, תראה פה כל שליחה ותשובה בזמן אמת.';
+          container.appendChild(e);
           return;
         }
 
-        messages.forEach(function(m) {
-          var tr = document.createElement('tr');
+        // Subtle visual hint when new rows arrive
+        const newItems = rows.length > lastRowCount;
+        lastRowCount = rows.length;
 
-          var tdTime = document.createElement('td');
-          tdTime.style.whiteSpace = 'nowrap';
-          tdTime.textContent = formatDate(m.created_at);
-          tr.appendChild(tdTime);
+        for (const r of rows) {
+          const row = document.createElement('div');
+          row.className = 'evt-row ' + r.status;
 
-          var tdGuest = document.createElement('td');
-          tdGuest.textContent = m.guest_name || 'לא ידוע';
-          tr.appendChild(tdGuest);
+          const head = document.createElement('div');
+          head.className = 'evt-head';
 
-          var tdDir = document.createElement('td');
-          var dirBadge = document.createElement('span');
-          dirBadge.className = m.direction === 'outgoing' ? 'badge badge-info' : 'badge badge-warning';
-          dirBadge.textContent = m.direction === 'outgoing' ? 'יוצא ←' : 'נכנס →';
-          tdDir.appendChild(dirBadge);
-          tr.appendChild(tdDir);
+          const name = document.createElement('span');
+          name.className = 'evt-name';
+          name.textContent = (r.guest_name || '(לא ידוע)');
+          head.appendChild(name);
 
-          var tdChannel = document.createElement('td');
-          var chBadge = document.createElement('span');
-          chBadge.className = m.channel === 'whatsapp' ? 'badge badge-success' : 'badge badge-secondary';
-          chBadge.textContent = m.channel === 'whatsapp' ? 'WA' : 'SMS';
-          tdChannel.appendChild(chBadge);
-          tr.appendChild(tdChannel);
+          const dir = document.createElement('span');
+          dir.className = 'evt-badge';
+          dir.textContent = DIRECTION_LABEL[r.direction] || r.direction;
+          dir.style.background = '#334155';
+          dir.style.color = '#cbd5e1';
+          head.appendChild(dir);
 
-          var tdBody = document.createElement('td');
-          tdBody.style.maxWidth = '350px';
-          tdBody.style.overflow = 'hidden';
-          tdBody.style.textOverflow = 'ellipsis';
-          tdBody.style.whiteSpace = 'nowrap';
-          tdBody.textContent = m.content || '';
-          tr.appendChild(tdBody);
+          const chn = document.createElement('span');
+          chn.className = 'evt-badge evt-chan-' + r.channel;
+          chn.textContent = CHANNEL_LABEL[r.channel] || r.channel;
+          head.appendChild(chn);
 
-          var tdStatus = document.createElement('td');
-          var sBadge = document.createElement('span');
-          sBadge.className = statusClass(m.status);
-          sBadge.textContent = statusLabel(m.status);
-          tdStatus.appendChild(sBadge);
-          if (m.status === 'failed' && m.error) {
-            var errDiv = document.createElement('div');
-            errDiv.style.fontSize = '0.75em';
-            errDiv.style.color = '#e06666';
-            errDiv.style.marginTop = '4px';
-            errDiv.style.maxWidth = '260px';
-            errDiv.style.whiteSpace = 'normal';
-            errDiv.style.wordBreak = 'break-word';
-            errDiv.title = m.error;
-            errDiv.textContent = m.error;
-            tdStatus.appendChild(errDiv);
+          const stat = document.createElement('span');
+          stat.className = 'evt-badge evt-status-' + r.status;
+          stat.textContent = STATUS_LABEL[r.status] || r.status;
+          head.appendChild(stat);
+
+          const t = document.createElement('span');
+          t.className = 'evt-time';
+          t.textContent = fmtTime(r.created_at);
+          t.title = r.created_at;
+          head.appendChild(t);
+
+          row.appendChild(head);
+
+          if (r.content) {
+            const body = document.createElement('div');
+            body.className = 'evt-body';
+            body.textContent = r.content;
+            row.appendChild(body);
           }
-          tr.appendChild(tdStatus);
 
-          tbody.appendChild(tr);
-        });
+          if ((r.status === 'failed' || r.status === 'undelivered') && r.error) {
+            const err = document.createElement('div');
+            err.className = 'evt-err';
+            err.textContent = 'סיבת כשלון: ' + r.error;
+            row.appendChild(err);
+          }
+
+          container.appendChild(row);
+        }
       } catch (e) {
-        showToast('שגיאה: ' + e.message, 'error');
+        showToast('שגיאה בטעינת פעילות: ' + e.message, 'error');
       }
     }
 
-    document.getElementById('filterDirection').addEventListener('change', loadMessages);
-    document.getElementById('filterChannel').addEventListener('change', loadMessages);
+    async function backfillErrors() {
+      const btn = document.getElementById('backfillBtn');
+      btn.disabled = true;
+      const t = btn.textContent;
+      btn.textContent = 'משוך...';
+      try {
+        const r = await api('/backfill-errors', { method: 'POST', body: '{}' });
+        showToast('שגיאות נמשכו: ' + r.updated + '/' + r.scanned, 'success');
+        loadActivity();
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = t;
+      }
+    }
 
-    document.addEventListener('DOMContentLoaded', loadMessages);
+    document.getElementById('filterDirection').addEventListener('change', loadActivity);
+    document.getElementById('filterChannel').addEventListener('change', loadActivity);
+    document.getElementById('filterStatus').addEventListener('change', loadActivity);
+
+    document.addEventListener('DOMContentLoaded', () => {
+      loadActivity();
+      autoRefreshInterval = setInterval(loadActivity, 5000);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { clearInterval(autoRefreshInterval); }
+      else { loadActivity(); autoRefreshInterval = setInterval(loadActivity, 5000); }
+    });
   </script>
 </body>
 </html>
