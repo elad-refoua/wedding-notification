@@ -11,10 +11,11 @@
   --bg-inner:  #0f172a;
   --bg-deep:   #0b1220;
 
-  /* Text hierarchy (5 levels) */
+  /* Text hierarchy (5 levels). Muted bumped from #64748b to #8b98a5 for WCAG AA contrast
+   * on --bg-card (was 3.35:1, now ~4.7:1 — passes AA for normal text). */
   --text-primary:   #e2e8f0;
   --text-secondary: #94a3b8;
-  --text-muted:     #64748b;
+  --text-muted:     #8b98a5;
   --text-data:      #cbd5e1;
   --text-disabled:  #475569;
 

@@ -71,7 +71,7 @@
 
     <div class="filter-row">
       <div class="form-group">
-        <label>כיוון</label>
+        <label for="filterDirection">כיוון</label>
         <select id="filterDirection">
           <option value="">הכל</option>
           <option value="outgoing">יוצא (אנחנו שלחנו)</option>
@@ -79,7 +79,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label>ערוץ</label>
+        <label for="filterChannel">ערוץ</label>
         <select id="filterChannel">
           <option value="">הכל</option>
           <option value="whatsapp">WhatsApp</option>
@@ -87,7 +87,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label>סטטוס</label>
+        <label for="filterStatus">סטטוס</label>
         <select id="filterStatus">
           <option value="">הכל</option>
           <option value="ok">הצליחו (נשלחו/נמסרו/נקראו)</option>
@@ -97,7 +97,7 @@
       </div>
     </div>
 
-    <div id="activityList">
+    <div id="activityList" aria-live="polite" aria-atomic="false" aria-label="פעילות בזמן אמת">
       <div class="empty-state"><span class="spinner"></span> טוען...</div>
     </div>
 

@@ -11,7 +11,7 @@
     <span class="brand">💍 ניהול חתונה</span>
     <a href="index.html">בית</a>
     <a href="guests.html">אורחים</a>
-    <a href="messages.html">הודעות</a>
+    <a href="messages.html">פעילות</a>
     <a href="reminders.html">תזכורות</a>
     <a href="settings.html">הגדרות</a>
     <a href="export.html">ייצוא</a>
@@ -26,42 +26,42 @@
       <div class="settings-grid">
         <!-- Templates -->
         <div class="form-group full-width">
-          <label>תבנית הזמנה</label>
+          <label for="sInviteTemplate">תבנית הזמנה</label>
           <small class="field-help">ההודעה שנשלחת למוזמנים בפעם הראשונה. השתמשו ב-{{name}} כדי לשתול את שם המוזמן.</small>
-          <textarea id="sInviteTemplate" rows="4" placeholder="שלום {name}, אתם מוזמנים לחתונה שלנו!"></textarea>
+          <textarea id="sInviteTemplate" rows="4" placeholder="שלום {{name}}, אתם מוזמנים לחתונה שלנו!"></textarea>
         </div>
         <div class="form-group full-width">
-          <label>תבנית תזכורת</label>
+          <label for="sReminderTemplate">תבנית תזכורת</label>
           <small class="field-help">ההודעה שנשלחת למוזמנים שעדיין לא אישרו הגעה. גם כאן {{name}} ישתול את השם.</small>
-          <textarea id="sReminderTemplate" rows="4" placeholder="שלום {name}, רק רצינו לוודא - האם אתם מגיעים?"></textarea>
+          <textarea id="sReminderTemplate" rows="4" placeholder="שלום {{name}}, רק רצינו לוודא - האם אתם מגיעים?"></textarea>
         </div>
 
         <!-- Reminder Settings -->
         <div class="form-group">
-          <label>מרווח תזכורות (ימים)</label>
+          <label for="sReminderInterval">מרווח תזכורות (ימים)</label>
           <small class="field-help">כל כמה ימים לשלוח תזכורת למי שלא ענה.</small>
           <input type="number" id="sReminderInterval" min="1" value="3">
         </div>
         <div class="form-group">
-          <label>מקסימום תזכורות</label>
+          <label for="sMaxReminders">מקסימום תזכורות</label>
           <small class="field-help">כמה תזכורות לשלוח לפני שמפסיקים. אחרי זה לא נשלחות יותר.</small>
           <input type="number" id="sMaxReminders" min="1" value="3">
         </div>
 
         <!-- Scheduling -->
         <div class="form-group">
-          <label>שעת דוח יומי</label>
+          <label for="sDailyReportTime">שעת דוח יומי</label>
           <small class="field-help">באיזו שעה לשלוח סיכום יומי למנהלים — כמה אישרו, כמה ממתינים.</small>
           <input type="time" id="sDailyReportTime" value="09:00">
         </div>
         <div class="form-group">
-          <label>גודל אצווה</label>
+          <label for="sBatchSize">גודל אצווה</label>
           <small class="field-help">כמה הודעות לשלוח בבת אחת לפני הפסקה. מונע חסימה ע"י טוויליו.</small>
           <input type="number" id="sBatchSize" min="1" value="20">
         </div>
 
         <div class="form-group">
-          <label>השהיה בין אצוות (שניות)</label>
+          <label for="sBatchDelay">השהיה בין אצוות (שניות)</label>
           <small class="field-help">כמה שניות לחכות בין אצווה לאצווה כדי לא להציף את השירות.</small>
           <input type="number" id="sBatchDelay" min="1" value="5">
         </div>
@@ -71,9 +71,16 @@
           <small class="field-help" style="margin-right:auto;">כשמסומן, המערכת יכולה לשלוח גם בוואטסאפ (לפי ערוץ ברירת המחדל למטה).</small>
         </div>
 
+        <!-- Wedding-mode kill switch: freezes auto-reminders + daily summary -->
+        <div class="form-group full-width" style="display:flex; align-items:center; gap:0.75rem; padding:0.85rem 1rem; background: var(--accent-red-bg); border: 1px solid var(--accent-red); border-radius: 8px;">
+          <input type="checkbox" id="sWeddingMode">
+          <label for="sWeddingMode" style="margin:0; color: var(--accent-red); font-weight:600;">מצב חתונה — הקפא הכל</label>
+          <small class="field-help" style="margin:0; color:var(--text-data);">כשמופעל: תזכורות אוטומטיות ודוחות יומיים מוקפאים. אורחים עדיין יכולים להשיב, והתשובות עדיין נרשמות. מושך אוטומטית ביום החתונה ואחריה.</small>
+        </div>
+
         <!-- Channel Strategy -->
         <div class="form-group">
-          <label>ערוץ ברירת מחדל</label>
+          <label for="sDefaultChannel">ערוץ ברירת מחדל</label>
           <small class="field-help">אוטומטי = וואטסאפ קודם, וב-SMS רק אם נכשל (לא כפילות).</small>
           <select id="sDefaultChannel">
             <option value="auto">אוטומטי (וואטסאפ עם נפילה ל-SMS)</option>
@@ -85,29 +92,29 @@
 
         <!-- WhatsApp Business Template SIDs -->
         <div class="form-group full-width">
-          <label>מזהה תבנית WhatsApp — הזמנה (HX...)</label>
+          <label for="sTplInviteSid">מזהה תבנית WhatsApp — הזמנה (HX...)</label>
           <small class="field-help">לאחר שמטא יאשרו את תבנית ההזמנה (ראה docs/WHATSAPP_TEMPLATES.md), העתק את ה-Content SID מה-Twilio Console לכאן. ללא זה נשלח טקסט חופשי (עובד בסנדבוקס, לא עובד מול שולח WABA).</small>
           <input type="text" id="sTplInviteSid" dir="ltr" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
         </div>
         <div class="form-group full-width">
-          <label>מזהה תבנית WhatsApp — תזכורת (HX...)</label>
+          <label for="sTplReminderSid">מזהה תבנית WhatsApp — תזכורת (HX...)</label>
           <small class="field-help">ה-Content SID של תבנית התזכורת, אחרי אישור מטא.</small>
           <input type="text" id="sTplReminderSid" dir="ltr" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
         </div>
         <div class="form-group full-width">
-          <label>מזהה תבנית WhatsApp — תודה (HX...)</label>
+          <label for="sTplThankyouSid">מזהה תבנית WhatsApp — תודה (HX...)</label>
           <small class="field-help">ה-Content SID של תבנית התודה לאחר אישור הגעה.</small>
           <input type="text" id="sTplThankyouSid" dir="ltr" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
         </div>
 
         <!-- Admin -->
         <div class="form-group full-width">
-          <label>טלפוני מנהלים (מופרד בפסיק)</label>
+          <label for="sAdminPhones">טלפוני מנהלים (מופרד בפסיק)</label>
           <small class="field-help">מספרי הטלפון שמקבלים התראות מהמערכת ויכולים לשלוח פקודות ניהול בוואטסאפ.</small>
           <input type="text" id="sAdminPhones" dir="ltr" placeholder="0501234567, 0529876543">
         </div>
         <div class="form-group full-width">
-          <label>אבני דרך</label>
+          <label for="sMilestones">אבני דרך</label>
           <small class="field-help">מספרי אישורים שבהם תישלח התראה חגיגית למנהלים. למשל: כשמגיעים ל-100 אישורים, 200, וכו'.</small>
           <input type="text" id="sMilestones" placeholder="50, 100, 200, 300, 400">
         </div>
@@ -124,11 +131,11 @@
       <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:1rem;">שלחו SMS לבדיקה שהמערכת עובדת. <strong style="color:#fbbf24;">שימו לב:</strong> בחשבון ניסיוני של Twilio, אפשר לשלוח רק למספרים מאומתים.</p>
       <div style="display:flex; gap:0.75rem; align-items:flex-end; flex-wrap:wrap;">
         <div class="form-group" style="flex:1; min-width:200px;">
-          <label>מספר טלפון</label>
+          <label for="testPhone">מספר טלפון</label>
           <input type="tel" id="testPhone" dir="ltr" placeholder="0525373331" value="0525373331">
         </div>
         <div class="form-group" style="flex:2; min-width:250px;">
-          <label>הודעה (אופציונלי)</label>
+          <label for="testMessage">הודעה (אופציונלי)</label>
           <input type="text" id="testMessage" placeholder="הודעת ניסיון ממערכת החתונה">
         </div>
         <div class="form-group">
@@ -151,6 +158,7 @@
       batch_size: 'sBatchSize',
       batch_delay_seconds: 'sBatchDelay',
       whatsapp_enabled: 'sWhatsappEnabled',
+      wedding_mode: 'sWeddingMode',
       default_channel: 'sDefaultChannel',
       whatsapp_template_invitation_sid: 'sTplInviteSid',
       whatsapp_template_reminder_sid: 'sTplReminderSid',

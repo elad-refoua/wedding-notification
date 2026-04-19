@@ -11,7 +11,7 @@
     <span class="brand">💍 ניהול חתונה</span>
     <a href="index.html">בית</a>
     <a href="guests.html">אורחים</a>
-    <a href="messages.html">הודעות</a>
+    <a href="messages.html">פעילות</a>
     <a href="reminders.html">תזכורות</a>
     <a href="settings.html">הגדרות</a>
     <a href="export.html">ייצוא</a>
@@ -25,7 +25,7 @@
     <!-- Filters -->
     <div class="filter-row">
       <div class="form-group">
-        <label>סטטוס</label>
+        <label for="filterStatus">סטטוס</label>
         <select id="filterStatus">
           <option value="">הכל</option>
           <option value="coming">מגיע</option>
@@ -37,7 +37,7 @@
         </select>
       </div>
       <div class="form-group">
-        <label>צד</label>
+        <label for="filterSide">צד</label>
         <select id="filterSide">
           <option value="">הכל</option>
           <option value="groom">חתן</option>
@@ -46,7 +46,7 @@
         </select>
       </div>
       <div class="form-group" style="flex:1; min-width:200px;">
-        <label>חיפוש</label>
+        <label for="filterSearch">חיפוש</label>
         <input type="text" id="filterSearch" placeholder="שם או טלפון...">
       </div>
       <div class="form-group">
@@ -100,7 +100,7 @@
         הדביקו רשימה מ-Excel / Google Sheets / WhatsApp. שורה לכל אורח, עמודות מופרדות ב-Tab או פסיק:
         <code style="direction:ltr; display:inline-block;">שם, טלפון, [חתן|כלה], [קבוצה]</code>
       </p>
-      <textarea id="pasteText" rows="8" style="width:100%; font-family:monospace; direction:ltr;" placeholder="דנה לוי, 0501234567, כלה, משפחה
+      <textarea id="pasteText" rows="8" style="width:100%; font-family:monospace;" dir="auto" placeholder="דנה לוי, 0501234567, כלה, משפחה
 יוסי כהן, 0547654321, חתן, חברי עבודה
 ..."></textarea>
       <div style="display:flex; gap:0.75rem; align-items:flex-end; margin-top:0.75rem;">
@@ -110,7 +110,7 @@
     </div>
 
     <!-- Preview Before Send -->
-    <div class="card" style="margin-top:1.5rem;">
+    <div class="card" style="margin-top:1.5rem;" id="preview">
       <h2 style="font-size:1rem; margin-bottom:0.75rem;">תצוגה מקדימה לפני שליחה</h2>
       <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:0.75rem;">בודק איך תיראה ההזמנה ל-3 האורחים הראשונים שבסטטוס "ממתין" — בלי לשלוח כלום.</p>
       <div style="display:flex; gap:0.75rem; align-items:flex-end;">
@@ -122,10 +122,10 @@
 
   <!-- Per-guest journey panel -->
   <div class="modal-overlay" id="guestPanelModal">
-    <div class="modal" style="max-width:640px;">
+    <div class="modal" style="max-width:640px;" role="dialog" aria-modal="true" aria-labelledby="panelTitle">
       <div class="modal-header">
         <h2 id="panelTitle">אורח</h2>
-        <button class="modal-close" onclick="closePanel()">&times;</button>
+        <button class="modal-close" onclick="closePanel()" aria-label="סגור">&times;</button>
       </div>
       <div id="panelBody">
         <div class="empty-state"><span class="spinner"></span>טוען...</div>
@@ -135,44 +135,45 @@
 
   <!-- Add/Edit Modal -->
   <div class="modal-overlay" id="guestModal">
-    <div class="modal">
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
       <div class="modal-header">
         <h2 id="modalTitle">הוסף אורח</h2>
-        <button class="modal-close" onclick="closeModal()">&times;</button>
+        <button class="modal-close" onclick="closeEditModal()" aria-label="סגור">&times;</button>
       </div>
       <form id="guestForm" onsubmit="saveGuest(event)">
         <input type="hidden" id="editId">
         <div class="form-group">
-          <label>שם *</label>
+          <label for="fName">שם *</label>
           <input type="text" id="fName" required>
         </div>
         <div class="form-group">
-          <label>טלפון *</label>
+          <label for="fPhone">טלפון *</label>
           <input type="tel" id="fPhone" required dir="ltr">
         </div>
         <div class="form-group">
-          <label>צד</label>
+          <label for="fSide">צד</label>
           <select id="fSide">
             <option value="">—</option>
             <option value="groom">חתן</option>
             <option value="bride">כלה</option>
-            <option value="">משותף</option>
+            <option value="both">משותף</option>
           </select>
         </div>
         <div class="form-group">
-          <label>קבוצה</label>
-          <input type="text" id="fGroup">
+          <label for="fGroup">קבוצה</label>
+          <input type="text" id="fGroup" list="existingGroupsList">
+          <datalist id="existingGroupsList"></datalist>
         </div>
         <div class="form-group">
-          <label>מספר מוזמנים</label>
+          <label for="fInvited">מספר מוזמנים</label>
           <input type="number" id="fInvited" min="1" value="1">
         </div>
         <div class="form-group">
-          <label>מספר מגיעים</label>
+          <label for="fComing">מספר מגיעים</label>
           <input type="number" id="fComing" min="0" value="0">
         </div>
         <div class="form-group">
-          <label>סטטוס</label>
+          <label for="fStatus">סטטוס</label>
           <select id="fStatus">
             <option value="pending">ממתין</option>
             <option value="invited">הוזמן</option>
@@ -183,12 +184,12 @@
           </select>
         </div>
         <div class="form-group">
-          <label>הערות</label>
+          <label for="fNotes">הערות</label>
           <textarea id="fNotes" rows="2"></textarea>
         </div>
         <div style="display:flex; gap:0.75rem; justify-content:flex-start; margin-top:1rem;">
           <button type="submit" class="btn btn-primary">שמור</button>
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">ביטול</button>
+          <button type="button" class="btn btn-secondary" onclick="closeEditModal()">ביטול</button>
         </div>
       </form>
     </div>
@@ -235,9 +236,18 @@
       allGuests.forEach(function(g) {
         var tr = document.createElement('tr');
         tr.style.cursor = 'pointer';
+        tr.tabIndex = 0;
+        tr.setAttribute('role', 'button');
+        tr.setAttribute('aria-label', 'פתח כרטיס אורח של ' + g.name);
+        var openPanel = function() { openGuestPanel(g.id); };
         tr.addEventListener('click', function(e) {
           if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
-          openGuestPanel(g.id);
+          openPanel();
+        });
+        tr.addEventListener('keydown', function(e) {
+          if ((e.key === 'Enter' || e.key === ' ') && e.target === tr) {
+            e.preventDefault(); openPanel();
+          }
         });
 
         var tdName = document.createElement('td');
@@ -327,11 +337,28 @@
       document.getElementById('guestForm').reset();
       document.getElementById('fInvited').value = 1;
       document.getElementById('fComing').value = 0;
-      document.getElementById('guestModal').classList.add('open');
+      populateGroupsDatalist();
+      var modal = document.getElementById('guestModal');
+      modal.classList.add('open');
+      openModal(modal.querySelector('.modal'));
     }
 
-    function closeModal() {
-      document.getElementById('guestModal').classList.remove('open');
+    function closeEditModal() {
+      var modal = document.getElementById('guestModal');
+      closeModal(modal.querySelector('.modal'));
+    }
+
+    // Batch-D D4: datalist of existing groups
+    function populateGroupsDatalist() {
+      var groups = [...new Set(allGuests.map(g => g.group_name).filter(Boolean))].sort();
+      var dl = document.getElementById('existingGroupsList');
+      if (!dl) return;
+      dl.textContent = '';
+      for (var g of groups) {
+        var opt = document.createElement('option');
+        opt.value = g;
+        dl.appendChild(opt);
+      }
     }
 
     function editGuest(id) {
@@ -347,7 +374,10 @@
       document.getElementById('fComing').value = g.num_coming || 0;
       document.getElementById('fStatus').value = g.status || 'pending';
       document.getElementById('fNotes').value = g.notes || '';
-      document.getElementById('guestModal').classList.add('open');
+      populateGroupsDatalist();
+      var modal = document.getElementById('guestModal');
+      modal.classList.add('open');
+      openModal(modal.querySelector('.modal'));
     }
 
     async function saveGuest(e) {
@@ -371,7 +401,7 @@
           await api('/guests', { method: 'POST', body: JSON.stringify(data) });
           showToast('אורח נוסף בהצלחה', 'success');
         }
-        closeModal();
+        closeEditModal();
         loadGuests();
       } catch (err) {
         showToast('שגיאה: ' + err.message, 'error');
@@ -454,7 +484,8 @@
     }
 
     async function openGuestPanel(guestId) {
-      const modal = document.getElementById('guestPanelModal');
+      const modalOverlay = document.getElementById('guestPanelModal');
+      const modalInner = modalOverlay.querySelector('.modal');
       const body = document.getElementById('panelBody');
       document.getElementById('panelTitle').textContent = 'טוען...';
       body.textContent = '';
@@ -463,7 +494,8 @@
       var spinEl = document.createElement('span'); spinEl.className = 'spinner'; loading.appendChild(spinEl);
       loading.appendChild(document.createTextNode('טוען...'));
       body.appendChild(loading);
-      modal.classList.add('open');
+      modalOverlay.classList.add('open');
+      openModal(modalInner);
 
       try {
         const data = await api('/guests/' + guestId + '/timeline');
@@ -480,7 +512,8 @@
     }
 
     function closePanel() {
-      document.getElementById('guestPanelModal').classList.remove('open');
+      var modalOverlay = document.getElementById('guestPanelModal');
+      closeModal(modalOverlay.querySelector('.modal'));
     }
 
     function renderPanel(data) {
@@ -772,7 +805,7 @@
 
     // Close modal on overlay click
     document.getElementById('guestModal').addEventListener('click', function(e) {
-      if (e.target === e.currentTarget) closeModal();
+      if (e.target === e.currentTarget) closeEditModal();
     });
 
     document.addEventListener('DOMContentLoaded', loadGuests);

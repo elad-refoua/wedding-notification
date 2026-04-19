@@ -2,10 +2,11 @@ const { getDb, getSetting } = require('../db/db');
 const path = require('path');
 const fs = require('fs');
 
-// === WithDb variants (for testing with in-memory DB) ===
+// Each function accepts an optional `db` parameter that defaults to the singleton.
+// Tests can pass their own in-memory DB; production code calls with no db arg.
+// Replaces the older pattern where every function had a `*WithDb` twin.
 
-function createFirstReminderWithDb(guestId, db) {
-  // Respect the per-guest pause flag — don't schedule reminders for a paused guest
+function createFirstReminder(guestId, db = getDb()) {
   const guest = db.prepare("SELECT reminders_paused FROM guests WHERE id = ?").get(guestId);
   if (guest && guest.reminders_paused) return;
 
@@ -22,52 +23,43 @@ function createFirstReminderWithDb(guestId, db) {
     .run(guestId, intervalDays, nextNum);
 }
 
-function cancelRemindersForGuestWithDb(guestId, db) {
+function cancelRemindersForGuest(guestId, db = getDb()) {
   db.prepare("UPDATE reminders SET status = 'cancelled' WHERE guest_id = ? AND status = 'pending'").run(guestId);
 }
 
-function pauseRemindersForGuestWithDb(guestId, db) {
+function pauseRemindersForGuest(guestId, db = getDb()) {
   db.prepare("UPDATE guests SET reminders_paused = 1 WHERE id = ?").run(guestId);
-  cancelRemindersForGuestWithDb(guestId, db);
+  cancelRemindersForGuest(guestId, db);
 }
 
-function resumeRemindersForGuestWithDb(guestId, db) {
+function resumeRemindersForGuest(guestId, db = getDb()) {
   db.prepare("UPDATE guests SET reminders_paused = 0 WHERE id = ?").run(guestId);
-  createFirstReminderWithDb(guestId, db);
+  createFirstReminder(guestId, db);
 }
 
-function cancelReminderByIdWithDb(reminderId, db) {
+function cancelReminderById(reminderId, db = getDb()) {
   const result = db.prepare("UPDATE reminders SET status = 'cancelled' WHERE id = ? AND status = 'pending'").run(reminderId);
   return result.changes > 0;
 }
 
-// === Production variants (use singleton DB) ===
-
-function createFirstReminder(guestId) {
-  createFirstReminderWithDb(guestId, getDb());
-}
-
-function cancelRemindersForGuest(guestId) {
-  cancelRemindersForGuestWithDb(guestId, getDb());
-}
-
-function pauseRemindersForGuest(guestId) {
-  pauseRemindersForGuestWithDb(guestId, getDb());
-}
-
-function resumeRemindersForGuest(guestId) {
-  resumeRemindersForGuestWithDb(guestId, getDb());
-}
-
-function cancelReminderById(reminderId) {
-  return cancelReminderByIdWithDb(reminderId, getDb());
-}
+// Back-compat aliases — tests and old callers use these names
+const createFirstReminderWithDb = (id, db) => createFirstReminder(id, db);
+const cancelRemindersForGuestWithDb = (id, db) => cancelRemindersForGuest(id, db);
+const pauseRemindersForGuestWithDb = (id, db) => pauseRemindersForGuest(id, db);
+const resumeRemindersForGuestWithDb = (id, db) => resumeRemindersForGuest(id, db);
+const cancelReminderByIdWithDb = (id, db) => cancelReminderById(id, db);
 
 // === Scheduled jobs ===
 
 async function processDueReminders() {
   const db = getDb();
   const { sendToGuest } = require('./twilio');
+
+  // Wedding-mode global freeze: one toggle that stops reminders AND daily summary
+  if (getSetting('wedding_mode') === 'true') {
+    console.log('Wedding mode on — skipping reminder processing');
+    return;
+  }
 
   // Skip reminders for guests whose reminders_paused flag is on — set via the dashboard toggle
   const dueReminders = db.prepare(
@@ -87,12 +79,19 @@ async function processDueReminders() {
     ).get(r.guest_id).c;
     if (recentSent > 0) continue;
 
-    const body = template.replace('{{name}}', r.name);
+    const body = template.replace(/\{\{name\}\}/g, r.name || '');
     try {
       const reminderTemplateSid = getSetting('whatsapp_template_reminder_sid') || null;
       const opts = reminderTemplateSid
-        ? { templateSid: reminderTemplateSid, templateVariables: { "1": r.name } }
+        ? { templateSid: reminderTemplateSid, templateVariables: { "1": r.name || '' } }
         : {};
+      // Re-verify the guest is still in a status that should receive reminders (they might have
+      // replied 'coming' between when we picked the row and now — avoid sending an obsolete reminder).
+      const currentStatus = db.prepare("SELECT status, reminders_paused FROM guests WHERE id = ?").get(r.guest_id);
+      if (!currentStatus || currentStatus.reminders_paused || !['invited','undecided'].includes(currentStatus.status)) {
+        db.prepare("UPDATE reminders SET status = 'cancelled' WHERE id = ?").run(r.id);
+        continue;
+      }
       await sendToGuest({ id: r.guest_id, phone: r.phone }, body, opts);
       db.prepare("UPDATE reminders SET status = 'sent', sent_at = datetime('now') WHERE id = ?").run(r.id);
 
@@ -112,6 +111,9 @@ async function processDueReminders() {
 async function sendDailySummary() {
   const db = getDb();
   const { sendToAdmins } = require('./twilio');
+
+  // Wedding-mode freeze
+  if (getSetting('wedding_mode') === 'true') return;
 
   const stats = {
     coming: db.prepare("SELECT COUNT(*) as c FROM guests WHERE status = 'coming'").get().c,
@@ -133,18 +135,24 @@ async function sendDailySummary() {
 }
 
 function backupDatabase() {
-  const dbPath = path.join(__dirname, '..', '..', 'guests.db');
-  const backupDir = path.join(__dirname, '..', '..', 'backups');
-  if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
-
-  const date = new Date().toISOString().split('T')[0];
-  const backupPath = path.join(backupDir, 'guests-' + date + '.db');
+  // Honor DB_PATH so we back up the right file on Cloud Run (DB is on the GCS volume, not local FS).
+  // Backup alongside the DB — so on Cloud Run the backups land on the persistent GCS volume too.
+  const dbPath = process.env.DB_PATH || path.join(__dirname, '..', '..', 'guests.db');
+  const defaultBackupDir = path.join(path.dirname(dbPath), 'backups');
+  const backupDir = process.env.BACKUP_DIR || defaultBackupDir;
 
   try {
+    if (!fs.existsSync(backupDir)) fs.mkdirSync(backupDir, { recursive: true });
+    if (!fs.existsSync(dbPath)) {
+      console.error('Backup skipped — DB file not found at ' + dbPath);
+      return;
+    }
+    const date = new Date().toISOString().split('T')[0];
+    const backupPath = path.join(backupDir, 'guests-' + date + '.db');
     fs.copyFileSync(dbPath, backupPath);
     console.log('Database backup created: ' + backupPath);
 
-    // Cleanup: keep only last 7 backups
+    // Cleanup: keep only last 7 daily backups
     const files = fs.readdirSync(backupDir).filter(f => f.startsWith('guests-') && f.endsWith('.db')).sort().reverse();
     for (const f of files.slice(7)) {
       fs.unlinkSync(path.join(backupDir, f));

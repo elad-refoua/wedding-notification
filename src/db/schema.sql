@@ -2,7 +2,7 @@ CREATE TABLE IF NOT EXISTS guests (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
   phone TEXT NOT NULL UNIQUE,
-  side TEXT CHECK(side IN ('groom', 'bride')),
+  side TEXT CHECK(side IN ('groom', 'bride', 'both')),
   group_name TEXT,
   num_invited INTEGER DEFAULT 1,
   num_coming INTEGER DEFAULT 0,
@@ -22,11 +22,11 @@ END;
 
 CREATE TABLE IF NOT EXISTS messages (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  guest_id INTEGER REFERENCES guests(id),
+  guest_id INTEGER REFERENCES guests(id) ON DELETE CASCADE,
   direction TEXT NOT NULL CHECK(direction IN ('outgoing', 'incoming')),
   channel TEXT NOT NULL CHECK(channel IN ('whatsapp', 'sms')),
   content TEXT,
-  status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'delivered', 'read', 'failed', 'received')),
+  status TEXT DEFAULT 'sent' CHECK(status IN ('sent', 'delivered', 'read', 'failed', 'received', 'queued', 'accepted')),
   twilio_sid TEXT,
   error TEXT,
   created_at DATETIME DEFAULT (datetime('now'))
@@ -34,12 +34,17 @@ CREATE TABLE IF NOT EXISTS messages (
 
 CREATE TABLE IF NOT EXISTS reminders (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
-  guest_id INTEGER REFERENCES guests(id),
+  guest_id INTEGER REFERENCES guests(id) ON DELETE CASCADE,
   scheduled_at DATETIME NOT NULL,
   sent_at DATETIME,
   reminder_num INTEGER NOT NULL DEFAULT 1,
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'sent', 'cancelled'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_messages_direction_status ON messages(direction, status);
+CREATE INDEX IF NOT EXISTS idx_messages_guest_id ON messages(guest_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_guest_id ON reminders(guest_id);
+CREATE INDEX IF NOT EXISTS idx_reminders_status_scheduled ON reminders(status, scheduled_at);
 
 CREATE TABLE IF NOT EXISTS settings (
   key TEXT PRIMARY KEY,
@@ -61,6 +66,7 @@ INSERT OR IGNORE INTO settings (key, value) VALUES
   ('batch_size', '10'),
   ('batch_delay_seconds', '60'),
   ('whatsapp_enabled', 'true'),
+  ('wedding_mode', 'false'),
   ('default_channel', 'whatsapp'),
   ('whatsapp_template_invitation_sid', ''),
   ('whatsapp_template_reminder_sid', ''),

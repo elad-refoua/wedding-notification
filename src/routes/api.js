@@ -3,6 +3,18 @@ const path = require('path');
 const router = express.Router();
 const { getDb, getSetting, setSetting } = require('../db/db');
 const { normalizePhone } = require('../utils/phone');
+const reminderSvc = require('../services/reminder');
+const twilioSvc = require('../services/twilio');
+const importerSvc = require('../services/importer');
+const bulkSvc = require('../services/bulk');
+
+// Middleware: load guest by :id param (or 404). Attaches req.guest for handlers.
+function loadGuest(req, res, next) {
+  const guest = getDb().prepare('SELECT * FROM guests WHERE id = ?').get(req.params.id);
+  if (!guest) return res.status(404).json({ error: 'האורח לא נמצא' });
+  req.guest = guest;
+  next();
+}
 
 // GET /api/guests — list with optional filters
 router.get('/guests', (req, res) => {
@@ -41,6 +53,8 @@ router.post('/guests', (req, res) => {
 });
 
 // PUT /api/guests/:id — update guest
+const ALLOWED_STATUSES = new Set(['pending', 'invited', 'coming', 'not_coming', 'undecided', 'opted_out']);
+const ALLOWED_SIDES = new Set(['groom', 'bride', 'both']);
 router.put('/guests/:id', (req, res) => {
   const db = getDb();
   const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(req.params.id);
@@ -54,6 +68,10 @@ router.put('/guests/:id', (req, res) => {
         const p = normalizePhone(req.body[f]);
         if (!p) return res.status(400).json({ error: 'Invalid phone' });
         updates.push('phone = ?'); params.push(p);
+      } else if (f === 'status' && req.body[f] !== null && req.body[f] !== '' && !ALLOWED_STATUSES.has(req.body[f])) {
+        return res.status(400).json({ error: 'Invalid status value: ' + req.body[f] });
+      } else if (f === 'side' && req.body[f] !== null && req.body[f] !== '' && !ALLOWED_SIDES.has(req.body[f])) {
+        return res.status(400).json({ error: 'Invalid side value: ' + req.body[f] });
       } else {
         updates.push(f + ' = ?'); params.push(req.body[f]);
       }
@@ -102,30 +120,19 @@ router.get('/messages', (req, res) => {
 
 // POST /api/reminders/:id/cancel — cancel one specific upcoming reminder (doesn't affect others)
 router.post('/reminders/:id/cancel', (req, res) => {
-  const { cancelReminderById } = require('../services/reminder');
-  const ok = cancelReminderById(req.params.id);
+  const ok = reminderSvc.cancelReminderById(req.params.id);
   if (!ok) return res.status(404).json({ error: 'תזכורת לא נמצאה או כבר לא ממתינה' });
   res.json({ cancelled: true });
 });
 
-// POST /api/guests/:id/pause-reminders — pause ALL future reminders for a guest (flag + cancel pending)
-router.post('/guests/:id/pause-reminders', (req, res) => {
-  const db = getDb();
-  const guest = db.prepare('SELECT id, name FROM guests WHERE id = ?').get(req.params.id);
-  if (!guest) return res.status(404).json({ error: 'האורח לא נמצא' });
-  const { pauseRemindersForGuest } = require('../services/reminder');
-  pauseRemindersForGuest(req.params.id);
-  res.json({ paused: true, guest: guest.name });
+router.post('/guests/:id/pause-reminders', loadGuest, (req, res) => {
+  reminderSvc.pauseRemindersForGuest(req.guest.id);
+  res.json({ paused: true, guest: req.guest.name });
 });
 
-// POST /api/guests/:id/resume-reminders — resume reminders; schedules the next one immediately
-router.post('/guests/:id/resume-reminders', (req, res) => {
-  const db = getDb();
-  const guest = db.prepare('SELECT id, name FROM guests WHERE id = ?').get(req.params.id);
-  if (!guest) return res.status(404).json({ error: 'האורח לא נמצא' });
-  const { resumeRemindersForGuest } = require('../services/reminder');
-  resumeRemindersForGuest(req.params.id);
-  res.json({ resumed: true, guest: guest.name });
+router.post('/guests/:id/resume-reminders', loadGuest, (req, res) => {
+  reminderSvc.resumeRemindersForGuest(req.guest.id);
+  res.json({ resumed: true, guest: req.guest.name });
 });
 
 // POST /api/reminders/cancel-all-pending — one-click cancel ALL pending reminders (system-wide).
@@ -146,28 +153,29 @@ router.get('/reminders', (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 
-// GET /api/settings
+// GET /api/settings — never return secrets, even masked. Instead return a boolean flag
+// telling the client "this key IS configured" so the UI can show a green checkmark
+// without risking round-trip overwrites.
 router.get('/settings', (req, res) => {
   const rows = getDb().prepare('SELECT * FROM settings').all();
   const obj = {};
   for (const row of rows) obj[row.key] = row.value;
-  // Mask sensitive keys
-  if (obj.gemini_api_key) {
-    const key = obj.gemini_api_key;
-    obj.gemini_api_key = '****...' + key.slice(-4);
-  }
+  obj.gemini_api_key_set = Boolean(obj.gemini_api_key);
+  delete obj.gemini_api_key;
   res.json(obj);
 });
 
 // PUT /api/settings — all changes committed in one SQLite transaction so the
-// DB file on the GCS FUSE volume flushes once, not once per key (which used to
-// take 10+ seconds for a full-form save and timed out Firefox).
+// DB file on the GCS FUSE volume flushes once, not once per key (used to take
+// 10+ seconds for a full-form save).
+// Secrets are now write-only (never returned by GET); the *_set booleans from GET
+// mean clients never send mask placeholders back.
 router.put('/settings', (req, res) => {
   const db = getDb();
   const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
   const txn = db.transaction((entries) => {
     for (const [key, value] of entries) {
-      if (key === 'gemini_api_key' && typeof value === 'string' && value.startsWith('****')) continue;
+      if (key === 'gemini_api_key_set') continue; // read-only flag
       if (value === null || value === undefined) continue;
       stmt.run(key, String(value));
     }
@@ -181,62 +189,94 @@ router.put('/settings', (req, res) => {
   }
 });
 
-// POST /api/send-invitations — send invitations to pending guests
+// POST /api/send-invitations — send invitations to pending guests (bulk).
+// body.channel?   'whatsapp' | 'sms' | 'auto' | 'both' — overrides default_channel for this run
+// body.group?     filter to a specific group
+// body.limit?     dry-run limit (10/50/etc.) — pick the first N pending guests
+// Serialized via in-process lock so concurrent invocations fail fast; progress readable
+// from GET /api/bulk-status for live UI updates.
 router.post('/send-invitations', async (req, res) => {
   try {
     const db = getDb();
-    const { sendToGuest } = require('../services/twilio');
+    const bulk = require('../services/bulk');
     const { createFirstReminder } = require('../services/reminder');
     const template = getSetting('invitation_template') || 'שלום {{name}}, אתם מוזמנים לחתונה של נתנאל ועמית!';
     const templateSid = getSetting('whatsapp_template_invitation_sid') || null;
-    const batchSize = parseInt(getSetting('batch_size') || '10');
-    const batchDelay = parseInt(getSetting('batch_delay_seconds') || '60') * 1000;
-    const channelOverride = req.body.channel || null; // 'whatsapp' | 'sms' | 'auto' | 'both' | null
+    const channelOverride = req.body.channel || null;
+    const limit = req.body.limit ? parseInt(req.body.limit) : null;
 
     let sql = "SELECT * FROM guests WHERE status = 'pending'";
     const params = [];
     if (req.body.group) { sql += ' AND group_name LIKE ?'; params.push('%' + req.body.group + '%'); }
+    sql += ' ORDER BY id ASC';
+    if (limit && limit > 0) sql += ' LIMIT ' + limit;
     const guests = db.prepare(sql).all(...params);
 
-    if (!guests.length) return res.json({ sent: 0, total: 0, message: 'אין אורחים ממתינים' });
+    if (!guests.length) return res.json({ total: 0, message: 'אין אורחים ממתינים' });
 
-    // Send in background, return immediately
-    const total = guests.length;
+    if (!bulk.tryLock('bulk_send', { total: guests.length })) {
+      return res.status(409).json({ error: 'שליחה אחרת כבר רצה — חכה לסיומה (ראה פעילות).' });
+    }
+
     (async () => {
-      let sent = 0;
-      for (let i = 0; i < guests.length; i++) {
-        const g = guests[i];
-        const body = template.replace(/\{\{name\}\}/g, g.name);
-        try {
-          const opts = { channel: channelOverride || undefined };
-          if (templateSid) {
-            opts.templateSid = templateSid;
-            opts.templateVariables = { "1": g.name };
+      try {
+        const result = await bulk.bulkSend(
+          guests,
+          g => template.replace(/\{\{name\}\}/g, g.name),
+          {
+            channel: channelOverride || undefined,
+            templateSidFor: templateSid ? g => ({ templateSid, templateVariables: { "1": g.name } }) : null
+          },
+          (done, total, lastResult) => {
+            // This runs after each guest. lastResult has { sms, whatsapp, delivered }.
+            const g = guests[done - 1];
+            bulk.updateProgress('bulk_send', { done, lastGuestName: g.name });
+            if (lastResult && lastResult.delivered) {
+              db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
+              try { createFirstReminder(g.id); } catch (_) {}
+              bulk.updateProgress('bulk_send', { ok: (bulk.status().jobs.bulk_send?.ok || 0) + 1 });
+            } else {
+              bulk.updateProgress('bulk_send', { fail: (bulk.status().jobs.bulk_send?.fail || 0) + 1 });
+            }
           }
-          const result = await sendToGuest(g, body, opts);
-          // Only promote to 'invited' when at least one channel actually accepted the send.
-          // If both SMS and WhatsApp failed (result.delivered === null), leave status='pending'
-          // so the guest shows up in the next retry/send and admin can see they were NOT contacted.
-          if (result && result.delivered) {
-            db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
-            createFirstReminder(g.id);
-            sent++;
-          } else {
-            console.warn('Invitation NOT delivered for ' + g.name + ' — keeping status=pending');
-          }
-        } catch (err) {
-          console.error('Send invitation failed for ' + g.name + ':', err.message);
-        }
-        if ((i + 1) % batchSize === 0 && i < guests.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, batchDelay));
-        }
+        );
+        console.log('Bulk send complete: ok=' + result.ok + ' fail=' + result.fail + ' total=' + result.total);
+      } finally {
+        bulk.release('bulk_send');
       }
-      console.log('Bulk send complete: ' + sent + '/' + total);
-    })().catch(err => console.error('Bulk send failed:', err));
+    })().catch(err => { console.error('Bulk send failed:', err); bulk.release('bulk_send'); });
 
-    res.json({ sent: 0, total, message: 'מתחיל שליחה ל-' + total + ' אורחים...' });
+    res.json({ total: guests.length, message: 'מתחיל שליחה ל-' + guests.length + ' אורחים. מעקב התקדמות זמין בפעילות.' });
   } catch (e) {
     res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/bulk-status — live progress of the currently-running bulk job (or nothing running)
+router.get('/bulk-status', (req, res) => {
+  const bulk = require('../services/bulk');
+  res.json(bulk.status());
+});
+
+// GET /api/system-status — real Twilio account info + channel/setting context for the dashboard header
+router.get('/system-status', async (req, res) => {
+  try {
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      return res.json({ twilio_account_type: 'unknown', reason: 'missing credentials' });
+    }
+    const twilio = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+    const acct = await twilio.api.accounts(process.env.TWILIO_ACCOUNT_SID).fetch();
+    res.json({
+      twilio_account_type: acct.type || 'unknown', // 'Trial' | 'Full'
+      twilio_status: acct.status || 'unknown',
+      twilio_friendly_name: acct.friendlyName,
+      default_channel: getSetting('default_channel') || 'auto',
+      whatsapp_enabled: getSetting('whatsapp_enabled') === 'true',
+      whatsapp_template_invitation_configured: Boolean(getSetting('whatsapp_template_invitation_sid')),
+      wedding_mode: getSetting('wedding_mode') === 'true'
+    });
+  } catch (e) {
+    res.json({ twilio_account_type: 'unknown', reason: e.message });
   }
 });
 
@@ -261,26 +301,32 @@ router.post('/preview-invitation', (req, res) => {
   });
 });
 
-// POST /api/backfill-errors — for any outgoing message with status='failed' and empty error,
-// fetch the Twilio Message record and record error_code/error_message. Safe to call repeatedly.
+// POST /api/backfill-errors — fetch Twilio error detail for failed/undelivered messages
+// missing our local error column. Bounded to 50 rows per call to avoid Cloud Run 504;
+// returns { remaining } so the client can loop. Respects the bulk lock so it never runs
+// while a send is in flight.
 router.post('/backfill-errors', async (req, res) => {
   const db = getDb();
+  const bulk = require('../services/bulk');
+  if (bulk.status().any_running) {
+    return res.status(409).json({ error: 'שליחה פעילה — חכה לסיומה וחזור.' });
+  }
+  const LIMIT = 50;
   const twilio = require('twilio')(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
-  const rows = db.prepare("SELECT id, twilio_sid FROM messages WHERE status IN ('failed','undelivered') AND (error IS NULL OR error = '') AND twilio_sid IS NOT NULL").all();
+  const rows = db.prepare("SELECT id, twilio_sid FROM messages WHERE status IN ('failed','undelivered') AND (error IS NULL OR error = '') AND twilio_sid IS NOT NULL LIMIT ?").all(LIMIT);
+  const remainingRow = db.prepare("SELECT COUNT(*) as c FROM messages WHERE status IN ('failed','undelivered') AND (error IS NULL OR error = '') AND twilio_sid IS NOT NULL").get();
   let updated = 0, skipped = 0;
-  const { getSetting } = require('../db/db');
-  const hints = { '21608': 'שדר Twilio Trial — מספרים לא מאומתים נחסמים.', '63007': 'WhatsApp Sandbox: הנמען לא שלח "join getting-film" ל-+14155238886.', '63015': 'WhatsApp Sandbox: הנמען לא שלח "join getting-film" ל-+14155238886.', '21211': 'מספר היעד לא תקני.', '21610': 'הנמען ביטל מנוי ("STOP").', '63016': 'הודעת טקסט חופשי מחוץ לחלון 24 שעות — חובה תבנית מאושרת.' };
   for (const r of rows) {
     try {
       const m = await twilio.messages(r.twilio_sid).fetch();
-      const detail = (m.errorCode ? '[' + m.errorCode + '] ' : '') + (m.errorMessage || '') + (hints[String(m.errorCode)] ? ' — ' + hints[String(m.errorCode)] : '');
+      const detail = (m.errorCode ? '[' + m.errorCode + '] ' : '') + (m.errorMessage || '');
       if (detail.trim()) {
         db.prepare('UPDATE messages SET error = ? WHERE id = ?').run(detail.trim(), r.id);
         updated++;
       } else { skipped++; }
     } catch (e) { skipped++; }
   }
-  res.json({ updated, skipped, scanned: rows.length });
+  res.json({ updated, skipped, scanned: rows.length, remaining: Math.max(0, remainingRow.c - rows.length) });
 });
 
 // GET /api/activity — unified chronological activity feed (sends, replies, status updates).
@@ -306,13 +352,27 @@ router.get('/activity', (req, res) => {
   });
 });
 
-// POST /api/messages/:id/resend — resend the same content to the same guest using the current
-// default_channel strategy. Works on any message (most useful for failed outgoing ones).
+// POST /api/messages/:id/resend — resend the same content to the same guest.
+// Idempotent within a 3-second window per message-id so double-clicking the "שלח שוב"
+// button doesn't fire two Twilio requests for the same original.
+const _recentResends = new Map(); // messageId -> ts
 router.post('/messages/:id/resend', async (req, res) => {
   try {
     const db = getDb();
     const { sendToGuest } = require('../services/twilio');
-    const m = db.prepare('SELECT * FROM messages WHERE id = ?').get(req.params.id);
+    const messageId = req.params.id;
+
+    const last = _recentResends.get(messageId);
+    if (last && Date.now() - last < 3000) {
+      return res.status(429).json({ error: 'שליחה חוזרת כבר בתהליך לאותה הודעה — המתן שנייה-שתיים.' });
+    }
+    _recentResends.set(messageId, Date.now());
+    // Garbage-collect old entries
+    if (_recentResends.size > 200) {
+      for (const [k, t] of _recentResends.entries()) if (Date.now() - t > 10000) _recentResends.delete(k);
+    }
+
+    const m = db.prepare('SELECT * FROM messages WHERE id = ?').get(messageId);
     if (!m) return res.status(404).json({ error: 'ההודעה לא נמצאה' });
     if (!m.guest_id) return res.status(400).json({ error: 'אין אורח מקושר להודעה זו' });
     const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(m.guest_id);
@@ -327,39 +387,58 @@ router.post('/messages/:id/resend', async (req, res) => {
   }
 });
 
-// POST /api/retry-failed — bulk retry every outgoing message whose LATEST attempt to its guest
-// is still failed/undelivered. One-click recovery after fixing a problem (e.g. opting into the
-// WhatsApp sandbox, upgrading Twilio, switching channel). Body: { channel?: 'sms'|'whatsapp'|'auto' }
+// POST /api/retry-failed — bulk retry every guest whose most-recent outgoing message is failed.
+// Serialized by the same lock family as /send-invitations so the two can't race.
 router.post('/retry-failed', async (req, res) => {
   try {
     const db = getDb();
-    const { sendToGuest } = require('../services/twilio');
-    // For each guest, find their most-recent outgoing message and retry if that one is failed.
-    // Avoids resending to guests who already got a successful delivery afterwards.
+    const bulk = require('../services/bulk');
     const rows = db.prepare(`
-      SELECT m.* FROM messages m
+      SELECT m.*, g.name as gname FROM messages m
       INNER JOIN (
         SELECT guest_id, MAX(created_at) AS last_at
         FROM messages WHERE direction = 'outgoing' AND guest_id IS NOT NULL GROUP BY guest_id
       ) latest ON latest.guest_id = m.guest_id AND latest.last_at = m.created_at
+      LEFT JOIN guests g ON m.guest_id = g.id
       WHERE m.direction = 'outgoing' AND m.status IN ('failed','undelivered')
     `).all();
-    if (!rows.length) return res.json({ retried: 0, total: 0, message: 'אין הודעות נכשלות לשליחה חוזרת' });
-    // Kick off in background (Cloud Run allows this since max_instances=1)
-    const total = rows.length;
+    if (!rows.length) return res.json({ total: 0, message: 'אין הודעות נכשלות לשליחה חוזרת' });
+
+    // Share the same lock name as bulk_send — they cannot run concurrently because the
+    // send path also writes guest.status and the retry path reads the message table.
+    if (!bulk.tryLock('bulk_send', { total: rows.length })) {
+      return res.status(409).json({ error: 'שליחה אחרת כבר רצה — חכה לסיומה (ראה פעילות).' });
+    }
+
+    // Build virtual "guest" objects from the row set so bulkSend can iterate them the same way
+    const guests = rows.map(r => ({ id: r.guest_id, phone: null, name: r.gname, _msgContent: r.content || '' }));
+    // Phone comes from DB per guest when sending
+    for (const g of guests) {
+      const gd = db.prepare('SELECT phone FROM guests WHERE id = ?').get(g.id);
+      if (gd) g.phone = gd.phone;
+    }
+
     (async () => {
-      let ok = 0, fail = 0;
-      for (const m of rows) {
-        try {
-          const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(m.guest_id);
-          if (!guest) { fail++; continue; }
-          const result = await sendToGuest(guest, m.content || '', { channel: req.body && req.body.channel ? req.body.channel : undefined });
-          if (result.delivered) ok++; else fail++;
-        } catch (e) { fail++; console.error('Retry failed for message ' + m.id + ':', e.message); }
+      try {
+        const result = await bulk.bulkSend(
+          guests.filter(g => g.phone),
+          g => g._msgContent,
+          { channel: req.body && req.body.channel ? req.body.channel : undefined },
+          (done, total, lastResult) => {
+            const g = guests[done - 1];
+            bulk.updateProgress('bulk_send', { done, lastGuestName: g && g.name });
+            const s = bulk.status().jobs.bulk_send || {};
+            if (lastResult && lastResult.delivered) bulk.updateProgress('bulk_send', { ok: (s.ok || 0) + 1 });
+            else bulk.updateProgress('bulk_send', { fail: (s.fail || 0) + 1 });
+          }
+        );
+        console.log('Retry-failed complete: ok=' + result.ok + ' fail=' + result.fail + ' of ' + result.total);
+      } finally {
+        bulk.release('bulk_send');
       }
-      console.log('Retry-failed batch complete: ok=' + ok + ' fail=' + fail + ' of ' + total);
-    })().catch(err => console.error('Retry-failed batch error:', err));
-    res.json({ retried: 0, total, message: 'שליחה חוזרת התחילה ל-' + total + ' הודעות. בדוק את הפעילות תוך שניות.' });
+    })().catch(err => { console.error('Retry-failed error:', err); bulk.release('bulk_send'); });
+
+    res.json({ total: rows.length, message: 'שליחה חוזרת התחילה ל-' + rows.length + ' הודעות.' });
   } catch (e) {
     console.error('Retry-failed error:', e);
     res.status(500).json({ error: e.message });
@@ -367,10 +446,9 @@ router.post('/retry-failed', async (req, res) => {
 });
 
 // GET /api/guest/:id/timeline — full per-guest message history, chronological oldest-first
-router.get('/guests/:id/timeline', (req, res) => {
+router.get('/guests/:id/timeline', loadGuest, (req, res) => {
   const db = getDb();
-  const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(req.params.id);
-  if (!guest) return res.status(404).json({ error: 'Guest not found' });
+  const guest = req.guest;
   const messages = db.prepare("SELECT * FROM messages WHERE guest_id = ? ORDER BY created_at ASC").all(req.params.id);
   const reminders = db.prepare("SELECT * FROM reminders WHERE guest_id = ? ORDER BY scheduled_at ASC").all(req.params.id);
   res.json({ guest, messages, reminders });

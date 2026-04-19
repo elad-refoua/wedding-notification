@@ -71,8 +71,21 @@
       </div>
     </div>
 
+    <!-- Live bulk-send progress (auto-shows when a job is running) -->
+    <div class="card" id="bulkProgressCard" style="display:none; border-right:3px solid var(--accent-blue);">
+      <h2 class="section-title" style="margin:0 0 0.5rem; padding:0; border:none;">שליחה מתבצעת כרגע</h2>
+      <div class="progress-wrap" style="margin-bottom:0.5rem;">
+        <div class="progress-label"><span><span id="bpDone">0</span> / <span id="bpTotal">0</span> אורחים</span><span>אחרון: <span id="bpName">—</span></span></div>
+        <div class="progress-bar"><div class="fill" id="bpFill" style="width:0%"></div></div>
+      </div>
+      <div style="display:flex; gap:1rem; font-size:0.85rem;">
+        <span style="color:var(--accent-green);">✓ <span id="bpOk">0</span> הצליחו</span>
+        <span style="color:var(--accent-red);">✗ <span id="bpFail">0</span> נכשלו</span>
+      </div>
+    </div>
+
     <!-- Primary action card — changes based on state -->
-    <div class="card" id="sendCard">
+    <div class="card" id="sendCard" style="margin-top:1.25rem;">
       <div id="sendCardContent">טוען...</div>
     </div>
 
@@ -82,7 +95,7 @@
         <h2 class="section-title" style="margin:0; padding:0; border:none;">פעילות אחרונה</h2>
         <a href="messages.html" style="font-size:0.85rem; color: var(--accent-blue); text-decoration:none;">כל הפעילות ←</a>
       </div>
-      <div id="activityFeed">
+      <div id="activityFeed" aria-live="polite" aria-atomic="false" aria-label="פעילות אחרונה">
         <div class="empty-state"><span class="spinner"></span>טוען...</div>
       </div>
     </div>
@@ -125,25 +138,75 @@
       return 'בעוד ' + Math.round(diffMin / (60 * 24)) + ' ימים';
     }
 
+    // Build a context-bar cell safely from a label + a bold value + optional muted trailing text.
+    // Built with textContent — never innerHTML — so guest names are always safe.
+    function setCtxCell(el, labelText, boldText, trailText, boldClass) {
+      el.textContent = '';
+      el.appendChild(document.createTextNode(labelText));
+      const strong = document.createElement('strong');
+      if (boldClass) strong.className = boldClass;
+      strong.textContent = boldText;
+      el.appendChild(strong);
+      if (trailText) {
+        el.appendChild(document.createTextNode(' '));
+        const trail = document.createElement('span');
+        trail.style.cssText = 'color:var(--text-muted);font-size:0.78rem;';
+        trail.textContent = trailText;
+        el.appendChild(trail);
+      }
+    }
+
     async function loadContext() {
       try {
-        const settings = await api('/settings');
-        const reminders = await api('/reminders?status=pending');
+        const [settings, reminders, sys] = await Promise.all([
+          api('/settings'),
+          api('/reminders?status=pending'),
+          api('/system-status').catch(() => ({ twilio_account_type: 'unknown' }))
+        ]);
 
         const ch = settings.default_channel || 'auto';
-        document.getElementById('ctxChannel').innerHTML = 'ערוץ: <strong>' + (CHANNEL_LABEL[ch] || ch) + '</strong>';
+        setCtxCell(document.getElementById('ctxChannel'), 'ערוץ: ', (CHANNEL_LABEL[ch] || ch));
 
-        // Twilio account status — trial or upgraded (inferred from whether a trial warning applies)
+        // Twilio account status — REAL value from the server, not hardcoded
         const acct = document.getElementById('ctxAccount');
-        acct.innerHTML = 'חשבון Twilio: <strong class="ctx-warn">ניסיון</strong> <span style="color:var(--text-muted);font-size:0.78rem;">(רק מספרים מאומתים)</span>';
+        if (sys.twilio_account_type === 'Full' || sys.twilio_account_type === 'paid') {
+          setCtxCell(acct, 'חשבון Twilio: ', 'מלא', '(שולח לכל מספר)', 'ctx-ok');
+        } else if (sys.twilio_account_type === 'Trial' || sys.twilio_account_type === 'trial') {
+          setCtxCell(acct, 'חשבון Twilio: ', 'ניסיון', '(רק מספרים מאומתים)', 'ctx-warn');
+        } else {
+          setCtxCell(acct, 'חשבון Twilio: ', '—');
+        }
 
-        // Next reminder
+        // Wedding-mode indicator in the context bar
+        if (sys.wedding_mode) {
+          const existing = document.getElementById('ctxWeddingMode');
+          if (!existing) {
+            const bar = document.getElementById('contextBar');
+            const sep = document.createElement('span'); sep.className = 'ctx-sep'; sep.textContent = '·';
+            bar.appendChild(sep);
+            const wm = document.createElement('span'); wm.id = 'ctxWeddingMode'; wm.className = 'ctx-item';
+            const strong = document.createElement('strong'); strong.className = 'ctx-err'; strong.textContent = 'מצב חתונה פעיל';
+            wm.appendChild(strong);
+            bar.appendChild(wm);
+          }
+        } else {
+          const existing = document.getElementById('ctxWeddingMode');
+          if (existing) existing.remove();
+        }
+
+        // Tell the send card whether a WhatsApp template is needed but missing
+        window._whatsappTemplateNeeded = sys.whatsapp_enabled &&
+          (sys.default_channel === 'whatsapp' || sys.default_channel === 'auto') &&
+          !sys.whatsapp_template_invitation_configured &&
+          sys.twilio_account_type !== 'Trial' && sys.twilio_account_type !== 'trial';
+
+        // Next reminder — XSS-safe via textContent
         const nextEl = document.getElementById('ctxNextReminder');
         if (reminders.length) {
           const next = reminders[0];
-          nextEl.innerHTML = 'תזכורת הבאה: <strong>' + fmtFutureTime(next.scheduled_at) + '</strong> <span style="color:var(--text-muted);font-size:0.78rem;">ל־' + (next.guest_name || '?') + '</span>';
+          setCtxCell(nextEl, 'תזכורת הבאה: ', fmtFutureTime(next.scheduled_at), 'ל־' + (next.guest_name || '?'));
         } else {
-          nextEl.innerHTML = 'תזכורת הבאה: <strong>אין מתוזמנות</strong>';
+          setCtxCell(nextEl, 'תזכורת הבאה: ', 'אין מתוזמנות');
         }
       } catch (e) { /* silent */ }
     }
@@ -210,20 +273,43 @@
         p.style.marginBottom = '0.85rem';
         p.textContent = s.pending + ' אורחים ממתינים לקבל הזמנה ראשונה.';
         sendDiv.appendChild(p);
-        const btns = document.createElement('div');
-        btns.style.cssText = 'display:flex; gap:0.5rem; flex-wrap:wrap;';
+
+        // Dry-run selector — lets user pick how many to send this round (safer than one big button)
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; gap:0.5rem; flex-wrap:wrap; align-items:flex-end; margin-bottom:0.75rem;';
+        const sizeWrap = document.createElement('div'); sizeWrap.className = 'form-group'; sizeWrap.style.margin = '0';
+        const sizeLbl = document.createElement('label'); sizeLbl.setAttribute('for', 'sendLimit'); sizeLbl.textContent = 'כמות';
+        const sizeSel = document.createElement('select'); sizeSel.id = 'sendLimit';
+        const options = [
+          { v: '10', t: '10 ראשונים (בדיקה)' },
+          { v: '50', t: '50 הבאים' },
+          { v: '100', t: '100 הבאים' },
+          { v: '', t: 'כל הממתינים (' + s.pending + ')' }
+        ];
+        for (const o of options) { const opt = document.createElement('option'); opt.value = o.v; opt.textContent = o.t; sizeSel.appendChild(opt); }
+        sizeWrap.appendChild(sizeLbl); sizeWrap.appendChild(sizeSel);
+
         const sendBtn = document.createElement('button');
         sendBtn.className = 'btn btn-primary';
         sendBtn.id = 'sendBtn';
-        sendBtn.textContent = 'שלח הזמנות לממתינים (' + s.pending + ')';
+        sendBtn.textContent = 'שלח הזמנות';
         sendBtn.onclick = sendInvitations;
+
         const prevBtn = document.createElement('a');
         prevBtn.href = 'guests.html#preview';
         prevBtn.className = 'btn btn-secondary';
         prevBtn.textContent = 'תצוגה מקדימה';
-        btns.appendChild(sendBtn);
-        btns.appendChild(prevBtn);
-        sendDiv.appendChild(btns);
+
+        row.appendChild(sizeWrap); row.appendChild(sendBtn); row.appendChild(prevBtn);
+        sendDiv.appendChild(row);
+
+        // WABA safety: warn if the channel is whatsapp-first but no template SID is configured
+        if (window._whatsappTemplateNeeded) {
+          const warn = document.createElement('div');
+          warn.style.cssText = 'background:var(--accent-yellow-bg); color:var(--accent-yellow); padding:0.5rem 0.75rem; border-radius:6px; font-size:0.82rem; margin-top:0.5rem;';
+          warn.textContent = '⚠ שים לב: הערוץ הוא WhatsApp אבל אין מזהה תבנית מאושרת. אם החשבון מלא (לא ניסיון), שליחה חופשית תיכשל. עדכן בהגדרות.';
+          sendDiv.appendChild(warn);
+        }
       } else {
         const h = document.createElement('h2');
         h.className = 'section-title';
@@ -240,18 +326,45 @@
 
     async function sendInvitations() {
       const btn = document.getElementById('sendBtn');
-      const pending = document.getElementById('statPending').textContent;
-      if (!confirm('לשלוח הזמנות ל-' + pending + ' אורחים ממתינים?\nהאם יש גם לרוץ בדיקת ערוץ קודם בדף ההגדרות?')) return;
+      const limitEl = document.getElementById('sendLimit');
+      const limit = limitEl ? limitEl.value : '';
+      const targetCount = limit ? parseInt(limit) : parseInt(document.getElementById('statPending').textContent);
+      const what = limit ? (limit + ' הראשונים') : 'כל הממתינים (' + targetCount + ')';
+      if (!confirm('לשלוח הזמנות ל-' + what + '?')) return;
       btn.disabled = true; btn.textContent = 'שולח...';
       try {
-        const result = await api('/send-invitations', { method: 'POST', body: JSON.stringify({}) });
+        const body = limit ? { limit: parseInt(limit) } : {};
+        const result = await api('/send-invitations', { method: 'POST', body: JSON.stringify(body) });
         showToast(result.message || 'שליחה החלה', 'success');
-        setTimeout(refresh, 2500);
+        setTimeout(refresh, 2000);
       } catch (e) {
-        showToast('שגיאה: ' + e.message, 'error');
+        if (e.message && e.message.indexOf('שליחה אחרת') !== -1) {
+          showToast('כבר רצה שליחה — חכה לסיומה.', 'warning');
+        } else {
+          showToast('שגיאה: ' + e.message, 'error');
+        }
       } finally {
-        btn.disabled = false;
+        btn.disabled = false; btn.textContent = 'שלח הזמנות';
       }
+    }
+
+    // Live progress of bulk send — polls /api/bulk-status when a job is running.
+    async function loadBulkProgress() {
+      try {
+        const data = await api('/bulk-status');
+        const job = data && data.jobs && data.jobs.bulk_send;
+        const card = document.getElementById('bulkProgressCard');
+        if (!card) return;
+        if (!job) { card.style.display = 'none'; return; }
+        card.style.display = 'block';
+        document.getElementById('bpDone').textContent = job.done || 0;
+        document.getElementById('bpTotal').textContent = job.total || 0;
+        document.getElementById('bpOk').textContent = job.ok || 0;
+        document.getElementById('bpFail').textContent = job.fail || 0;
+        document.getElementById('bpName').textContent = job.last_guest_name || '—';
+        const pct = job.total ? Math.round(100 * job.done / job.total) : 0;
+        document.getElementById('bpFill').style.width = pct + '%';
+      } catch (_) { /* silent */ }
     }
 
     async function loadActivity() {
@@ -332,7 +445,7 @@
     }
 
     async function refresh() {
-      try { await Promise.all([loadStats(), loadActivity(), loadContext()]); }
+      try { await Promise.all([loadStats(), loadActivity(), loadContext(), loadBulkProgress()]); }
       catch (e) { /* handled in each loader */ }
     }
 

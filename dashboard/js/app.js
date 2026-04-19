@@ -85,8 +85,10 @@ function statusClass(status) {
 }
 
 // ──── Direction labels ────
+// In RTL the visual flow is right-to-left, so "outgoing/away from reader" is a right-pointing arrow (→)
+// and "incoming/toward reader" is a left-pointing arrow (←). Previous labels had them inverted.
 function directionLabel(dir) {
-  return dir === 'outgoing' ? 'יוצא ←' : 'נכנס →';
+  return dir === 'outgoing' ? 'יוצא →' : 'נכנס ←';
 }
 
 // ──── Channel labels ────
@@ -114,21 +116,80 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // ──── Toast notifications ────
+// Container is an ARIA live region so screen readers announce new toasts as they appear.
+// Errors are assertive (interrupt), other toasts are polite.
 function showToast(message, type = 'info') {
   let container = document.querySelector('.toast-container');
   if (!container) {
     container = document.createElement('div');
     container.className = 'toast-container';
+    container.setAttribute('role', 'status');
+    container.setAttribute('aria-live', 'polite');
+    container.setAttribute('aria-atomic', 'false');
     document.body.appendChild(container);
   }
   const toast = document.createElement('div');
   toast.className = 'toast ' + type;
   toast.textContent = message;
+  if (type === 'error') toast.setAttribute('role', 'alert');
   container.appendChild(toast);
   setTimeout(() => {
     toast.style.opacity = '0';
     setTimeout(() => toast.remove(), 300);
   }, 3500);
+}
+
+// ──── Modal a11y helper ────
+// Call `openModal(modalEl)` after adding the `open` class. Focus-traps tab navigation
+// inside the modal, closes on Escape, restores focus to the trigger on close.
+// Modal elements must carry `role="dialog" aria-modal="true"` on their inner card.
+const _modalStack = [];
+function openModal(modalEl) {
+  if (!modalEl) return;
+  const trigger = document.activeElement;
+  const handler = (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeModal(modalEl);
+      return;
+    }
+    if (e.key === 'Tab') {
+      const focusables = modalEl.querySelectorAll('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  };
+  document.body.style.overflow = 'hidden';
+  modalEl.addEventListener('keydown', handler);
+  _modalStack.push({ modalEl, handler, trigger });
+  // Focus first focusable element inside
+  const firstFocusable = modalEl.querySelector('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+  if (firstFocusable) firstFocusable.focus();
+}
+
+function closeModal(modalEl) {
+  if (!modalEl) return;
+  modalEl.classList.remove('open');
+  const entry = _modalStack.pop();
+  if (entry) {
+    entry.modalEl.removeEventListener('keydown', entry.handler);
+    if (entry.trigger && entry.trigger.focus) entry.trigger.focus();
+  }
+  if (!_modalStack.length) document.body.style.overflow = '';
+}
+
+// ──── Safe row-click (keyboard + mouse) ────
+// Apply to any element that should be activatable by click OR keyboard.
+function makeClickable(el, handler) {
+  el.tabIndex = 0;
+  el.setAttribute('role', 'button');
+  el.addEventListener('click', handler);
+  el.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler(e); }
+  });
 }
 
 // ──── Escape HTML ────
@@ -146,7 +207,7 @@ function getNavHTML() {
       <span class="brand">💍 ניהול חתונה</span>
       <a href="index.html">בית</a>
       <a href="guests.html">אורחים</a>
-      <a href="messages.html">הודעות</a>
+      <a href="messages.html">פעילות</a>
       <a href="reminders.html">תזכורות</a>
       <a href="settings.html">הגדרות</a>
       <a href="export.html">ייצוא</a>

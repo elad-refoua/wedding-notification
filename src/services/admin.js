@@ -91,41 +91,45 @@ async function executeAdminCommand(text, db) {
       const guests = db.prepare(sql).all(...params);
       if (!guests.length) return 'אין אורחים ממתינים לשליחה';
 
-      // Actually send invitations in background
+      const bulk = require('./bulk');
       const template = getSetting('invitation_template') || 'שלום {{name}}, אתם מוזמנים לחתונה של נתנאל ועמית!';
-      const batchSize = parseInt(getSetting('batch_size') || '10');
-      const batchDelay = parseInt(getSetting('batch_delay_seconds') || '60') * 1000;
-      const { sendToGuest, sendToAdmins } = require('./twilio');
+      const { sendToAdmins } = require('./twilio');
       const { createFirstReminder } = require('./reminder');
 
-      (async () => {
-        let sent = 0, failed = 0;
-        for (let i = 0; i < guests.length; i++) {
-          const g = guests[i];
-          const body = template.replace(/\{\{name\}\}/g, g.name);
-          try {
-            const result = await sendToGuest(g, body);
-            if (result && result.delivered) {
-              db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
-              createFirstReminder(g.id);
-              sent++;
-            } else {
-              // Both channels failed — leave status=pending so it's visible for retry
-              failed++;
-            }
-          } catch (err) {
-            failed++;
-            console.error('Send failed for ' + g.name + ':', err.message);
-          }
-          if ((i + 1) % batchSize === 0 && i < guests.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, batchDelay));
-          }
-        }
-        const summary = 'שליחה הושלמה: ' + sent + '/' + guests.length + ' הזמנות נשלחו' + (failed ? ' (' + failed + ' נכשלו — ראה פעילות)' : '');
-        await sendToAdmins(summary);
-      })().catch(err => console.error('Bulk send failed:', err));
+      // Refuse if another bulk is already running — prevents duplicate sends when admin
+      // presses "שלח לכולם" while a dashboard send is in flight.
+      if (!bulk.tryLock('bulk_send', { total: guests.length })) {
+        return 'שליחה אחרת כבר רצה. חכה לסיומה ואז חזור.';
+      }
 
-      return 'מתחיל שליחה ל-' + guests.length + ' אורחים... תקבלו עדכון בסיום.';
+      (async () => {
+        try {
+          const result = await bulk.bulkSend(
+            guests,
+            g => template.replace(/\{\{name\}\}/g, g.name),
+            {},
+            (done, total, lastResult) => {
+              const g = guests[done - 1];
+              bulk.updateProgress('bulk_send', { done, lastGuestName: g.name });
+              if (lastResult && lastResult.delivered) {
+                db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
+                try { createFirstReminder(g.id); } catch (_) {}
+                const s = bulk.status().jobs.bulk_send || {};
+                bulk.updateProgress('bulk_send', { ok: (s.ok || 0) + 1 });
+              } else {
+                const s = bulk.status().jobs.bulk_send || {};
+                bulk.updateProgress('bulk_send', { fail: (s.fail || 0) + 1 });
+              }
+            }
+          );
+          const summary = 'שליחה הושלמה: ' + result.ok + '/' + result.total + ' הזמנות' + (result.fail ? ' (' + result.fail + ' נכשלו — ראה פעילות)' : '');
+          await sendToAdmins(summary);
+        } finally {
+          bulk.release('bulk_send');
+        }
+      })().catch(err => { console.error('Bulk send failed:', err); bulk.release('bulk_send'); });
+
+      return 'מתחיל שליחה ל-' + guests.length + ' אורחים. תקבל עדכון בסיום.';
     }
     case 'add_guest': {
       const phone = normalizePhone(cmd.phone);

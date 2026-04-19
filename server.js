@@ -13,11 +13,16 @@ app.set('trust proxy', true);
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 
-// Auth middleware for API/dashboard routes
+// Auth middleware for API routes
+// Localhost bypass is DEV-ONLY. In production `trust proxy = true` makes req.ip reflect
+// X-Forwarded-For, which an attacker can spoof ("X-Forwarded-For: 127.0.0.1"). So we only
+// honor the localhost shortcut when NODE_ENV is not production AND check req.socket too.
 function authMiddleware(req, res, next) {
-  const ip = req.ip || req.socket?.remoteAddress;
-  if (ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1') {
-    return next();
+  if (process.env.NODE_ENV !== 'production') {
+    const socketAddr = req.socket?.remoteAddress;
+    if (socketAddr === '127.0.0.1' || socketAddr === '::1' || socketAddr === '::ffff:127.0.0.1') {
+      return next();
+    }
   }
   const token = req.headers.authorization?.replace('Bearer ', '');
   const expected = process.env.DASHBOARD_TOKEN;
