@@ -123,14 +123,26 @@ router.get('/settings', (req, res) => {
   res.json(obj);
 });
 
-// PUT /api/settings
+// PUT /api/settings — all changes committed in one SQLite transaction so the
+// DB file on the GCS FUSE volume flushes once, not once per key (which used to
+// take 10+ seconds for a full-form save and timed out Firefox).
 router.put('/settings', (req, res) => {
-  for (const [key, value] of Object.entries(req.body)) {
-    // Don't overwrite real API key with masked value
-    if (key === 'gemini_api_key' && value.startsWith('****')) continue;
-    setSetting(key, value);
+  const db = getDb();
+  const stmt = db.prepare('INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)');
+  const txn = db.transaction((entries) => {
+    for (const [key, value] of entries) {
+      if (key === 'gemini_api_key' && typeof value === 'string' && value.startsWith('****')) continue;
+      if (value === null || value === undefined) continue;
+      stmt.run(key, String(value));
+    }
+  });
+  try {
+    txn(Object.entries(req.body || {}));
+    res.json({ updated: true });
+  } catch (e) {
+    console.error('PUT /settings failed:', e);
+    res.status(500).json({ error: e.message });
   }
-  res.json({ updated: true });
 });
 
 // POST /api/send-invitations — send invitations to pending guests
@@ -165,10 +177,17 @@ router.post('/send-invitations', async (req, res) => {
             opts.templateSid = templateSid;
             opts.templateVariables = { "1": g.name };
           }
-          await sendToGuest(g, body, opts);
-          db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
-          createFirstReminder(g.id);
-          sent++;
+          const result = await sendToGuest(g, body, opts);
+          // Only promote to 'invited' when at least one channel actually accepted the send.
+          // If both SMS and WhatsApp failed (result.delivered === null), leave status='pending'
+          // so the guest shows up in the next retry/send and admin can see they were NOT contacted.
+          if (result && result.delivered) {
+            db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
+            createFirstReminder(g.id);
+            sent++;
+          } else {
+            console.warn('Invitation NOT delivered for ' + g.name + ' — keeping status=pending');
+          }
         } catch (err) {
           console.error('Send invitation failed for ' + g.name + ':', err.message);
         }
@@ -249,6 +268,66 @@ router.get('/activity', (req, res) => {
       incoming: db.prepare("SELECT COUNT(*) as c FROM messages WHERE direction='incoming'").get().c
     }
   });
+});
+
+// POST /api/messages/:id/resend — resend the same content to the same guest using the current
+// default_channel strategy. Works on any message (most useful for failed outgoing ones).
+router.post('/messages/:id/resend', async (req, res) => {
+  try {
+    const db = getDb();
+    const { sendToGuest } = require('../services/twilio');
+    const m = db.prepare('SELECT * FROM messages WHERE id = ?').get(req.params.id);
+    if (!m) return res.status(404).json({ error: 'ההודעה לא נמצאה' });
+    if (!m.guest_id) return res.status(400).json({ error: 'אין אורח מקושר להודעה זו' });
+    const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(m.guest_id);
+    if (!guest) return res.status(404).json({ error: 'האורח נמחק' });
+    const body = m.content || '';
+    if (!body) return res.status(400).json({ error: 'אין תוכן לשליחה חוזרת' });
+    const result = await sendToGuest(guest, body, { channel: req.body && req.body.channel ? req.body.channel : undefined });
+    res.json({ resent: true, delivered: result.delivered, sms: result.sms, whatsapp: result.whatsapp });
+  } catch (e) {
+    console.error('Resend failed:', e);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/retry-failed — bulk retry every outgoing message whose LATEST attempt to its guest
+// is still failed/undelivered. One-click recovery after fixing a problem (e.g. opting into the
+// WhatsApp sandbox, upgrading Twilio, switching channel). Body: { channel?: 'sms'|'whatsapp'|'auto' }
+router.post('/retry-failed', async (req, res) => {
+  try {
+    const db = getDb();
+    const { sendToGuest } = require('../services/twilio');
+    // For each guest, find their most-recent outgoing message and retry if that one is failed.
+    // Avoids resending to guests who already got a successful delivery afterwards.
+    const rows = db.prepare(`
+      SELECT m.* FROM messages m
+      INNER JOIN (
+        SELECT guest_id, MAX(created_at) AS last_at
+        FROM messages WHERE direction = 'outgoing' AND guest_id IS NOT NULL GROUP BY guest_id
+      ) latest ON latest.guest_id = m.guest_id AND latest.last_at = m.created_at
+      WHERE m.direction = 'outgoing' AND m.status IN ('failed','undelivered')
+    `).all();
+    if (!rows.length) return res.json({ retried: 0, total: 0, message: 'אין הודעות נכשלות לשליחה חוזרת' });
+    // Kick off in background (Cloud Run allows this since max_instances=1)
+    const total = rows.length;
+    (async () => {
+      let ok = 0, fail = 0;
+      for (const m of rows) {
+        try {
+          const guest = db.prepare('SELECT * FROM guests WHERE id = ?').get(m.guest_id);
+          if (!guest) { fail++; continue; }
+          const result = await sendToGuest(guest, m.content || '', { channel: req.body && req.body.channel ? req.body.channel : undefined });
+          if (result.delivered) ok++; else fail++;
+        } catch (e) { fail++; console.error('Retry failed for message ' + m.id + ':', e.message); }
+      }
+      console.log('Retry-failed batch complete: ok=' + ok + ' fail=' + fail + ' of ' + total);
+    })().catch(err => console.error('Retry-failed batch error:', err));
+    res.json({ retried: 0, total, message: 'שליחה חוזרת התחילה ל-' + total + ' הודעות. בדוק את הפעילות תוך שניות.' });
+  } catch (e) {
+    console.error('Retry-failed error:', e);
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // GET /api/guest/:id/timeline — full per-guest message history, chronological oldest-first

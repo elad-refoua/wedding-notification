@@ -99,23 +99,30 @@ async function executeAdminCommand(text, db) {
       const { createFirstReminder } = require('./reminder');
 
       (async () => {
-        let sent = 0;
+        let sent = 0, failed = 0;
         for (let i = 0; i < guests.length; i++) {
           const g = guests[i];
           const body = template.replace(/\{\{name\}\}/g, g.name);
           try {
-            await sendToGuest(g, body);
-            db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
-            createFirstReminder(g.id);
-            sent++;
+            const result = await sendToGuest(g, body);
+            if (result && result.delivered) {
+              db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
+              createFirstReminder(g.id);
+              sent++;
+            } else {
+              // Both channels failed — leave status=pending so it's visible for retry
+              failed++;
+            }
           } catch (err) {
+            failed++;
             console.error('Send failed for ' + g.name + ':', err.message);
           }
           if ((i + 1) % batchSize === 0 && i < guests.length - 1) {
             await new Promise(resolve => setTimeout(resolve, batchDelay));
           }
         }
-        await sendToAdmins('שליחה הושלמה: ' + sent + '/' + guests.length + ' הזמנות נשלחו');
+        const summary = 'שליחה הושלמה: ' + sent + '/' + guests.length + ' הזמנות נשלחו' + (failed ? ' (' + failed + ' נכשלו — ראה פעילות)' : '');
+        await sendToAdmins(summary);
       })().catch(err => console.error('Bulk send failed:', err));
 
       return 'מתחיל שליחה ל-' + guests.length + ' אורחים... תקבלו עדכון בסיום.';

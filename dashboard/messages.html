@@ -57,7 +57,8 @@
         <span class="live-dot"></span>
         <span>מתרענן אוטומטית כל 5 שניות</span>
         <button class="btn btn-secondary" onclick="loadActivity()" id="refreshBtn" style="margin-right:0.5rem;">רענן עכשיו</button>
-        <button class="btn btn-secondary" onclick="backfillErrors()" id="backfillBtn" title="שולף מ-Twilio את סיבות הכשלון של הודעות ישנות שעוד לא היו מפוענחות">משוך שגיאות</button>
+        <button class="btn btn-warning" onclick="retryFailed()" id="retryFailedBtn" title="שולח שוב את ההודעה האחרונה לכל מי שעדיין בסטטוס 'נכשל' (לפי ערוץ ברירת המחדל הנוכחי)">שלח שוב את הנכשלים</button>
+        <button class="btn btn-secondary" onclick="backfillErrors()" id="backfillBtn" title="שולף מ-Twilio את סיבות הכשלון של הודעות ישנות שעוד לא היו מפוענחות" style="margin-right:0.5rem;">משוך שגיאות</button>
       </div>
     </div>
 
@@ -211,17 +212,64 @@
             row.appendChild(body);
           }
 
-          if ((r.status === 'failed' || r.status === 'undelivered') && r.error) {
-            const err = document.createElement('div');
-            err.className = 'evt-err';
-            err.textContent = 'סיבת כשלון: ' + r.error;
-            row.appendChild(err);
+          if (r.status === 'failed' || r.status === 'undelivered') {
+            if (r.error) {
+              const err = document.createElement('div');
+              err.className = 'evt-err';
+              err.textContent = 'סיבת כשלון: ' + r.error;
+              row.appendChild(err);
+            }
+            // One-click resend for this specific message (uses current default_channel)
+            if (r.direction === 'outgoing') {
+              const actions = document.createElement('div');
+              actions.style.cssText = 'margin-top:0.5rem; display:flex; gap:0.5rem;';
+              const resendBtn = document.createElement('button');
+              resendBtn.className = 'btn btn-success';
+              resendBtn.style.cssText = 'padding:0.3rem 0.75rem; font-size:0.85rem;';
+              resendBtn.textContent = 'שלח שוב';
+              resendBtn.onclick = () => resendOne(r.id, resendBtn);
+              actions.appendChild(resendBtn);
+              row.appendChild(actions);
+            }
           }
 
           container.appendChild(row);
         }
       } catch (e) {
         showToast('שגיאה בטעינת פעילות: ' + e.message, 'error');
+      }
+    }
+
+    async function resendOne(messageId, btn) {
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = 'שולח...';
+      try {
+        const r = await api('/messages/' + messageId + '/resend', { method: 'POST', body: '{}' });
+        showToast(r.delivered ? 'נשלח מחדש דרך ' + r.delivered : 'השליחה החוזרת נכשלה — בדוק שוב ברשימה', r.delivered ? 'success' : 'error');
+        setTimeout(loadActivity, 1500);
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = orig;
+      }
+    }
+
+    async function retryFailed() {
+      const btn = document.getElementById('retryFailedBtn');
+      if (!confirm('לשלוח שוב את כל ההודעות שנכשלו? (לפי ערוץ ברירת המחדל הנוכחי)')) return;
+      btn.disabled = true;
+      const orig = btn.textContent;
+      btn.textContent = 'שולח...';
+      try {
+        const r = await api('/retry-failed', { method: 'POST', body: '{}' });
+        showToast(r.message || ('שליחה החלה ל-' + r.total + ' הודעות'), 'success');
+        setTimeout(loadActivity, 3000);
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
       }
     }
 
