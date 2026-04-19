@@ -263,6 +263,20 @@
         btnEdit.addEventListener('click', function() { editGuest(g.id); });
         tdActions.appendChild(btnEdit);
 
+        // Pause/resume reminders toggle (per-guest control)
+        var btnRem = document.createElement('button');
+        btnRem.className = 'btn btn-sm btn-secondary';
+        if (g.reminders_paused) {
+          btnRem.textContent = '▶ חדש תזכורות';
+          btnRem.title = 'חדש שליחת תזכורות לאורח הזה';
+          btnRem.addEventListener('click', function() { toggleReminders(g.id, g.name, true); });
+        } else {
+          btnRem.textContent = '⏸ השהה תזכורות';
+          btnRem.title = 'השהה את כל התזכורות הממתינות והעתידיות של האורח הזה';
+          btnRem.addEventListener('click', function() { toggleReminders(g.id, g.name, false); });
+        }
+        tdActions.appendChild(btnRem);
+
         var btnDel = document.createElement('button');
         btnDel.className = 'btn btn-sm btn-danger';
         btnDel.textContent = 'מחק';
@@ -370,6 +384,19 @@
       } finally {
         btn.disabled = false;
         btn.textContent = 'ייבוא';
+      }
+    }
+
+    async function toggleReminders(guestId, name, wasPaused) {
+      var action = wasPaused ? 'resume-reminders' : 'pause-reminders';
+      var confirmMsg = wasPaused ? ('לחדש שליחת תזכורות עבור ' + name + '?') : ('להשהות את כל התזכורות של ' + name + '? (אפשר לחדש בכל רגע)');
+      if (!confirm(confirmMsg)) return;
+      try {
+        await api('/guests/' + guestId + '/' + action, { method: 'POST', body: '{}' });
+        showToast((wasPaused ? 'תזכורות חודשו עבור ' : 'תזכורות הושהו עבור ') + name, 'success');
+        loadGuests();
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
       }
     }
 

@@ -24,9 +24,13 @@ function getDb() {
 }
 
 function runMigrations(d) {
-  const cols = d.prepare("PRAGMA table_info(messages)").all().map(c => c.name);
-  if (!cols.includes('error')) {
+  const msgCols = d.prepare("PRAGMA table_info(messages)").all().map(c => c.name);
+  if (!msgCols.includes('error')) {
     d.prepare("ALTER TABLE messages ADD COLUMN error TEXT").run();
+  }
+  const guestCols = d.prepare("PRAGMA table_info(guests)").all().map(c => c.name);
+  if (!guestCols.includes('reminders_paused')) {
+    d.prepare("ALTER TABLE guests ADD COLUMN reminders_paused INTEGER DEFAULT 0").run();
   }
 }
 

@@ -11,7 +11,7 @@
     <span class="brand">💍 ניהול חתונה</span>
     <a href="index.html">בית</a>
     <a href="guests.html">אורחים</a>
-    <a href="messages.html">הודעות</a>
+    <a href="messages.html">פעילות</a>
     <a href="reminders.html">תזכורות</a>
     <a href="settings.html">הגדרות</a>
     <a href="export.html">ייצוא</a>
@@ -20,7 +20,13 @@
   </nav>
 
   <div class="container">
-    <h1 class="page-title">ניהול תזכורות</h1>
+    <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:0.75rem;">
+      <h1 class="page-title" style="margin:0;">ניהול תזכורות</h1>
+      <button class="btn btn-warning" onclick="cancelAllPending()" id="cancelAllBtn" title="מבטל את כל התזכורות שעדיין ממתינות לשליחה. הזמינים שכבר נשלחו לא מושפעים. לא משפיע על הגדרות תזכורות עתידיות.">בטל את כל התזכורות הממתינות</button>
+    </div>
+    <p style="color:#94a3b8; font-size:0.9rem; margin-top:0.5rem;">
+      כאן רואים כל תזכורת מתוכננת, נשלחה, או מבוטלת. אפשר לבטל תזכורות בודדות, או להשהות את כל התזכורות של אורח מסוים מדף <a href="guests.html" style="color:#0ea5e9">ניהול אורחים</a>.
+    </p>
 
     <!-- Filters -->
     <div class="filter-row">
@@ -28,7 +34,7 @@
         <label>סטטוס</label>
         <select id="filterStatus">
           <option value="">הכל</option>
-          <option value="pending">ממתין</option>
+          <option value="pending" selected>ממתין (צפוי להישלח)</option>
           <option value="sent">נשלח</option>
           <option value="cancelled">בוטל</option>
         </select>
@@ -41,13 +47,15 @@
         <thead>
           <tr>
             <th>אורח</th>
+            <th>טלפון</th>
             <th>זמן מתוכנן</th>
-            <th>תזכורת מס'</th>
+            <th>מס' תזכורת</th>
             <th>סטטוס</th>
+            <th>פעולות</th>
           </tr>
         </thead>
         <tbody id="remindersBody">
-          <tr><td colspan="4" class="empty-state"><span class="spinner"></span> טוען...</td></tr>
+          <tr><td colspan="6" class="empty-state"><span class="spinner"></span> טוען...</td></tr>
         </tbody>
       </table>
     </div>
@@ -55,12 +63,10 @@
 
   <script src="js/app.js"></script>
   <script>
-    // NOTE: All dynamic content built with safe DOM methods (textContent, createElement).
     function reminderStatusLabel(status) {
       var map = { pending: 'ממתין', sent: 'נשלח', cancelled: 'בוטל' };
       return map[status] || status || '';
     }
-
     function reminderStatusClass(status) {
       var map = { pending: 'badge-warning', sent: 'badge-success', cancelled: 'badge-dark' };
       return 'badge ' + (map[status] || 'badge-secondary');
@@ -79,9 +85,9 @@
         if (!reminders.length) {
           var tr = document.createElement('tr');
           var td = document.createElement('td');
-          td.colSpan = 4;
+          td.colSpan = 6;
           td.className = 'empty-state';
-          td.textContent = 'אין תזכורות להצגה';
+          td.textContent = 'אין תזכורות להצגה בסטטוס הנבחר';
           tr.appendChild(td);
           tbody.appendChild(tr);
           return;
@@ -92,7 +98,19 @@
 
           var tdGuest = document.createElement('td');
           tdGuest.textContent = r.guest_name || 'לא ידוע';
+          if (r.guest_paused) {
+            var pBadge = document.createElement('span');
+            pBadge.className = 'badge badge-dark';
+            pBadge.style.cssText = 'font-size:0.7rem; margin-right:0.4rem;';
+            pBadge.textContent = '⏸ מושהה';
+            tdGuest.appendChild(pBadge);
+          }
           tr.appendChild(tdGuest);
+
+          var tdPhone = document.createElement('td');
+          tdPhone.style.direction = 'ltr';
+          tdPhone.textContent = r.guest_phone || '—';
+          tr.appendChild(tdPhone);
 
           var tdTime = document.createElement('td');
           tdTime.style.whiteSpace = 'nowrap';
@@ -110,6 +128,35 @@
           tdStatus.appendChild(badge);
           tr.appendChild(tdStatus);
 
+          var tdActions = document.createElement('td');
+          if (r.status === 'pending') {
+            var cBtn = document.createElement('button');
+            cBtn.className = 'btn btn-warning';
+            cBtn.style.cssText = 'padding:0.25rem 0.65rem; font-size:0.85rem;';
+            cBtn.textContent = 'בטל';
+            cBtn.title = 'ביטול התזכורת הזו בלבד — לא משפיע על תזכורות עתידיות של האורח.';
+            cBtn.onclick = () => cancelOne(r.id, cBtn);
+            tdActions.appendChild(cBtn);
+
+            if (!r.guest_paused && r.guest_id) {
+              var pBtn = document.createElement('button');
+              pBtn.className = 'btn btn-secondary';
+              pBtn.style.cssText = 'padding:0.25rem 0.65rem; font-size:0.85rem; margin-right:0.4rem;';
+              pBtn.textContent = 'השהה לאורח';
+              pBtn.title = 'מבטל את כל התזכורות הממתינות של האורח הזה ומפסיק לתזמן חדשות עד שתחדש ידנית.';
+              pBtn.onclick = () => pauseGuest(r.guest_id, r.guest_name, pBtn);
+              tdActions.appendChild(pBtn);
+            } else if (r.guest_paused && r.guest_id) {
+              var rBtn = document.createElement('button');
+              rBtn.className = 'btn btn-success';
+              rBtn.style.cssText = 'padding:0.25rem 0.65rem; font-size:0.85rem; margin-right:0.4rem;';
+              rBtn.textContent = 'חדש לאורח';
+              rBtn.onclick = () => resumeGuest(r.guest_id, r.guest_name, rBtn);
+              tdActions.appendChild(rBtn);
+            }
+          }
+          tr.appendChild(tdActions);
+
           tbody.appendChild(tr);
         });
       } catch (e) {
@@ -117,8 +164,65 @@
       }
     }
 
-    document.getElementById('filterStatus').addEventListener('change', loadReminders);
+    async function cancelOne(reminderId, btn) {
+      if (!confirm('לבטל את התזכורת הזו?')) return;
+      btn.disabled = true;
+      btn.textContent = 'מבטל...';
+      try {
+        await api('/reminders/' + reminderId + '/cancel', { method: 'POST', body: '{}' });
+        showToast('התזכורת בוטלה', 'success');
+        loadReminders();
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+        btn.disabled = false;
+        btn.textContent = 'בטל';
+      }
+    }
 
+    async function pauseGuest(guestId, name, btn) {
+      if (!confirm('להשהות את כל התזכורות של ' + name + '? (אפשר לחדש בכל רגע)')) return;
+      btn.disabled = true;
+      try {
+        await api('/guests/' + guestId + '/pause-reminders', { method: 'POST', body: '{}' });
+        showToast('תזכורות הושהו עבור ' + name, 'success');
+        loadReminders();
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+        btn.disabled = false;
+      }
+    }
+
+    async function resumeGuest(guestId, name, btn) {
+      btn.disabled = true;
+      try {
+        await api('/guests/' + guestId + '/resume-reminders', { method: 'POST', body: '{}' });
+        showToast('תזכורות חודשו עבור ' + name, 'success');
+        loadReminders();
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+        btn.disabled = false;
+      }
+    }
+
+    async function cancelAllPending() {
+      if (!confirm('לבטל את כל התזכורות שעדיין ממתינות לשליחה במערכת? (לא משפיע על אלה שכבר נשלחו ולא על הגדרות עתידיות)')) return;
+      var btn = document.getElementById('cancelAllBtn');
+      btn.disabled = true;
+      var orig = btn.textContent;
+      btn.textContent = 'מבטל...';
+      try {
+        var r = await api('/reminders/cancel-all-pending', { method: 'POST', body: '{}' });
+        showToast('בוטלו ' + r.cancelled + ' תזכורות ממתינות', 'success');
+        loadReminders();
+      } catch (e) {
+        showToast('שגיאה: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = orig;
+      }
+    }
+
+    document.getElementById('filterStatus').addEventListener('change', loadReminders);
     document.addEventListener('DOMContentLoaded', loadReminders);
   </script>
 </body>

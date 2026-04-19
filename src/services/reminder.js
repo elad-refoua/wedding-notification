@@ -5,6 +5,10 @@ const fs = require('fs');
 // === WithDb variants (for testing with in-memory DB) ===
 
 function createFirstReminderWithDb(guestId, db) {
+  // Respect the per-guest pause flag — don't schedule reminders for a paused guest
+  const guest = db.prepare("SELECT reminders_paused FROM guests WHERE id = ?").get(guestId);
+  if (guest && guest.reminders_paused) return;
+
   const intervalDays = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'reminder_interval_days'").get()?.value) || 5;
   if (!Number.isFinite(intervalDays) || intervalDays < 1) return;
   const maxReminders = parseInt(db.prepare("SELECT value FROM settings WHERE key = 'max_reminders'").get()?.value) || 10;
@@ -22,6 +26,21 @@ function cancelRemindersForGuestWithDb(guestId, db) {
   db.prepare("UPDATE reminders SET status = 'cancelled' WHERE guest_id = ? AND status = 'pending'").run(guestId);
 }
 
+function pauseRemindersForGuestWithDb(guestId, db) {
+  db.prepare("UPDATE guests SET reminders_paused = 1 WHERE id = ?").run(guestId);
+  cancelRemindersForGuestWithDb(guestId, db);
+}
+
+function resumeRemindersForGuestWithDb(guestId, db) {
+  db.prepare("UPDATE guests SET reminders_paused = 0 WHERE id = ?").run(guestId);
+  createFirstReminderWithDb(guestId, db);
+}
+
+function cancelReminderByIdWithDb(reminderId, db) {
+  const result = db.prepare("UPDATE reminders SET status = 'cancelled' WHERE id = ? AND status = 'pending'").run(reminderId);
+  return result.changes > 0;
+}
+
 // === Production variants (use singleton DB) ===
 
 function createFirstReminder(guestId) {
@@ -32,14 +51,27 @@ function cancelRemindersForGuest(guestId) {
   cancelRemindersForGuestWithDb(guestId, getDb());
 }
 
+function pauseRemindersForGuest(guestId) {
+  pauseRemindersForGuestWithDb(guestId, getDb());
+}
+
+function resumeRemindersForGuest(guestId) {
+  resumeRemindersForGuestWithDb(guestId, getDb());
+}
+
+function cancelReminderById(reminderId) {
+  return cancelReminderByIdWithDb(reminderId, getDb());
+}
+
 // === Scheduled jobs ===
 
 async function processDueReminders() {
   const db = getDb();
   const { sendToGuest } = require('./twilio');
 
+  // Skip reminders for guests whose reminders_paused flag is on — set via the dashboard toggle
   const dueReminders = db.prepare(
-    "SELECT r.*, g.name, g.phone, g.id as guest_id, g.num_invited FROM reminders r JOIN guests g ON r.guest_id = g.id WHERE r.status = 'pending' AND r.scheduled_at <= datetime('now') AND g.status IN ('invited', 'undecided')"
+    "SELECT r.*, g.name, g.phone, g.id as guest_id, g.num_invited FROM reminders r JOIN guests g ON r.guest_id = g.id WHERE r.status = 'pending' AND r.scheduled_at <= datetime('now') AND g.status IN ('invited', 'undecided') AND COALESCE(g.reminders_paused, 0) = 0"
   ).all();
 
   const template = getSetting('reminder_template') || 'היי {{name}}, רצינו לוודא - נשמח לדעת אם תוכלו להגיע לחתונה';
@@ -159,8 +191,14 @@ function stopScheduledJobs() {
 module.exports = {
   createFirstReminder,
   cancelRemindersForGuest,
+  pauseRemindersForGuest,
+  resumeRemindersForGuest,
+  cancelReminderById,
   createFirstReminderWithDb,
   cancelRemindersForGuestWithDb,
+  pauseRemindersForGuestWithDb,
+  resumeRemindersForGuestWithDb,
+  cancelReminderByIdWithDb,
   processDueReminders,
   sendDailySummary,
   backupDatabase,

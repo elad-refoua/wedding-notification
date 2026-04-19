@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS guests (
   num_coming INTEGER DEFAULT 0,
   status TEXT DEFAULT 'pending' CHECK(status IN ('pending', 'invited', 'coming', 'not_coming', 'undecided', 'opted_out')),
   notes TEXT,
+  reminders_paused INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT (datetime('now')),
   updated_at DATETIME DEFAULT (datetime('now'))
 );

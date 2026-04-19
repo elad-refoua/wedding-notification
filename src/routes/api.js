@@ -100,10 +100,46 @@ router.get('/messages', (req, res) => {
   res.json(db.prepare(sql).all(...params));
 });
 
+// POST /api/reminders/:id/cancel — cancel one specific upcoming reminder (doesn't affect others)
+router.post('/reminders/:id/cancel', (req, res) => {
+  const { cancelReminderById } = require('../services/reminder');
+  const ok = cancelReminderById(req.params.id);
+  if (!ok) return res.status(404).json({ error: 'תזכורת לא נמצאה או כבר לא ממתינה' });
+  res.json({ cancelled: true });
+});
+
+// POST /api/guests/:id/pause-reminders — pause ALL future reminders for a guest (flag + cancel pending)
+router.post('/guests/:id/pause-reminders', (req, res) => {
+  const db = getDb();
+  const guest = db.prepare('SELECT id, name FROM guests WHERE id = ?').get(req.params.id);
+  if (!guest) return res.status(404).json({ error: 'האורח לא נמצא' });
+  const { pauseRemindersForGuest } = require('../services/reminder');
+  pauseRemindersForGuest(req.params.id);
+  res.json({ paused: true, guest: guest.name });
+});
+
+// POST /api/guests/:id/resume-reminders — resume reminders; schedules the next one immediately
+router.post('/guests/:id/resume-reminders', (req, res) => {
+  const db = getDb();
+  const guest = db.prepare('SELECT id, name FROM guests WHERE id = ?').get(req.params.id);
+  if (!guest) return res.status(404).json({ error: 'האורח לא נמצא' });
+  const { resumeRemindersForGuest } = require('../services/reminder');
+  resumeRemindersForGuest(req.params.id);
+  res.json({ resumed: true, guest: guest.name });
+});
+
+// POST /api/reminders/cancel-all-pending — one-click cancel ALL pending reminders (system-wide).
+// Useful for "stop all reminders until I re-enable" moments (wedding week, pause the pipeline).
+router.post('/reminders/cancel-all-pending', (req, res) => {
+  const db = getDb();
+  const result = db.prepare("UPDATE reminders SET status = 'cancelled' WHERE status = 'pending'").run();
+  res.json({ cancelled: result.changes });
+});
+
 // GET /api/reminders
 router.get('/reminders', (req, res) => {
   const db = getDb();
-  let sql = 'SELECT r.*, g.name as guest_name FROM reminders r LEFT JOIN guests g ON r.guest_id = g.id WHERE 1=1';
+  let sql = 'SELECT r.*, g.name as guest_name, g.phone as guest_phone, g.reminders_paused as guest_paused FROM reminders r LEFT JOIN guests g ON r.guest_id = g.id WHERE 1=1';
   const params = [];
   if (req.query.status) { sql += ' AND r.status = ?'; params.push(req.query.status); }
   sql += ' ORDER BY r.scheduled_at ASC';
