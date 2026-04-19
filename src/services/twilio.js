@@ -39,38 +39,101 @@ async function sendWhatsApp(to, body) {
 }
 
 /**
- * Send message to guest via SMS (+ WhatsApp if enabled). Logs to messages table.
- * NOTE: Does NOT update guest.status — caller is responsible for status transitions.
+ * Send a WhatsApp message using an approved Meta template (contentSid = 'HX...').
+ * Required for business-initiated messages outside the 24h session window once the
+ * account moves off the sandbox. Variables map positionally: { "1": "Dana", "2": "3" }.
  */
-async function sendToGuest(guest, body) {
-  const results = { sms: null, whatsapp: null };
+async function sendWhatsAppTemplate(to, contentSid, variables) {
+  const msg = await getClient().messages.create({
+    from: 'whatsapp:' + getWhatsAppPhone(),
+    to: 'whatsapp:' + to,
+    contentSid,
+    contentVariables: variables ? JSON.stringify(variables) : undefined,
+    statusCallback: process.env.WEBHOOK_BASE_URL + '/webhooks/whatsapp/status'
+  });
+  return msg.sid;
+}
+
+/**
+ * Send a single message to a guest using the configured channel strategy.
+ * Strategies (set via `default_channel` setting or per-call `opts.channel`):
+ *   'whatsapp' — WhatsApp only; logs failure if unreachable (no silent SMS fallback)
+ *   'sms'      — SMS only
+ *   'auto'     — try WhatsApp first, fall back to SMS on failure (one message actually delivered)
+ *   'both'     — legacy behaviour: send on both channels (guest gets two copies)
+ *
+ * `opts.templateSid` + `opts.templateVariables` — if present AND channel is whatsapp/auto,
+ * the WhatsApp send uses Twilio Content API (required for WABA senders outside 24h window).
+ *
+ * Every attempt is logged to the `messages` table with its channel and status, including
+ * failures (`status='failed'`, error column populated).
+ *
+ * Returns: { sms, whatsapp, delivered } — the Twilio SIDs of successful sends and which
+ * channel ultimately delivered. Does NOT update guest.status — callers own that.
+ */
+async function sendToGuest(guest, body, opts) {
+  opts = opts || {};
   const db = getDb();
   const whatsappEnabled = getSetting('whatsapp_enabled') === 'true';
+  const strategy = opts.channel || getSetting('default_channel') || 'auto';
+  const results = { sms: null, whatsapp: null, delivered: null };
 
-  try {
-    const sid = await sendSms(guest.phone, body);
-    results.sms = sid;
+  const logSent = (channel, content, sid) =>
     db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status, twilio_sid) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(guest.id, 'outgoing', 'sms', body, 'sent', sid);
-  } catch (err) {
-    const detail = formatTwilioError(err);
-    console.error('SMS failed for ' + guest.phone + ':', detail);
+      .run(guest.id, 'outgoing', channel, content, 'sent', sid);
+  const logFailed = (channel, content, detail) =>
     db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status, error) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(guest.id, 'outgoing', 'sms', body, 'failed', detail);
-  }
+      .run(guest.id, 'outgoing', channel, content, 'failed', detail);
 
-  if (whatsappEnabled) {
+  const tryWhatsApp = async () => {
     try {
-      const sid = await sendWhatsApp(guest.phone, body);
+      const sid = opts.templateSid
+        ? await sendWhatsAppTemplate(guest.phone, opts.templateSid, opts.templateVariables)
+        : await sendWhatsApp(guest.phone, body);
       results.whatsapp = sid;
-      db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status, twilio_sid) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(guest.id, 'outgoing', 'whatsapp', body, 'sent', sid);
+      results.delivered = results.delivered || 'whatsapp';
+      // Content column stores the rendered body for audit, even for template sends
+      logSent('whatsapp', body, sid);
+      return true;
     } catch (err) {
       const detail = formatTwilioError(err);
       console.error('WhatsApp failed for ' + guest.phone + ':', detail);
-      db.prepare('INSERT INTO messages (guest_id, direction, channel, content, status, error) VALUES (?, ?, ?, ?, ?, ?)')
-        .run(guest.id, 'outgoing', 'whatsapp', body, 'failed', detail);
+      logFailed('whatsapp', body, detail);
+      return false;
     }
+  };
+
+  const trySms = async () => {
+    try {
+      const sid = await sendSms(guest.phone, body);
+      results.sms = sid;
+      results.delivered = results.delivered || 'sms';
+      logSent('sms', body, sid);
+      return true;
+    } catch (err) {
+      const detail = formatTwilioError(err);
+      console.error('SMS failed for ' + guest.phone + ':', detail);
+      logFailed('sms', body, detail);
+      return false;
+    }
+  };
+
+  if (strategy === 'sms') {
+    await trySms();
+  } else if (strategy === 'whatsapp') {
+    if (!whatsappEnabled) {
+      // Respect enable flag — if WhatsApp is explicitly disabled, fall through to SMS so guest still gets a message
+      await trySms();
+    } else {
+      await tryWhatsApp();
+    }
+  } else if (strategy === 'both') {
+    await trySms();
+    if (whatsappEnabled) await tryWhatsApp();
+  } else {
+    // 'auto' (default): WhatsApp first, SMS only if WhatsApp fails
+    const waOk = whatsappEnabled && (await tryWhatsApp());
+    if (!waOk) await trySms();
   }
 
   return results;
@@ -113,4 +176,4 @@ function validateTwilioSignature(req) {
   return twilio.validateRequest(process.env.TWILIO_AUTH_TOKEN, signature, url, req.body);
 }
 
-module.exports = { sendSms, sendWhatsApp, sendToGuest, sendToAdmins, validateTwilioSignature, formatTwilioError };
+module.exports = { sendSms, sendWhatsApp, sendWhatsAppTemplate, sendToGuest, sendToAdmins, validateTwilioSignature, formatTwilioError };

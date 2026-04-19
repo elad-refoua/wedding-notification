@@ -92,6 +92,32 @@
       </div>
       <div id="importResult" style="margin-top:0.75rem; display:none;"></div>
     </div>
+
+    <!-- Paste Import Section -->
+    <div class="card" style="margin-top:1.5rem;">
+      <h2 style="font-size:1rem; margin-bottom:0.75rem;">הדבקת רשימה</h2>
+      <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:0.75rem;">
+        הדביקו רשימה מ-Excel / Google Sheets / WhatsApp. שורה לכל אורח, עמודות מופרדות ב-Tab או פסיק:
+        <code style="direction:ltr; display:inline-block;">שם, טלפון, [חתן|כלה], [קבוצה]</code>
+      </p>
+      <textarea id="pasteText" rows="8" style="width:100%; font-family:monospace; direction:ltr;" placeholder="דנה לוי, 0501234567, כלה, משפחה
+יוסי כהן, 0547654321, חתן, חברי עבודה
+..."></textarea>
+      <div style="display:flex; gap:0.75rem; align-items:flex-end; margin-top:0.75rem;">
+        <button class="btn btn-success" onclick="importPaste()" id="pasteBtn">ייבוא מההדבקה</button>
+      </div>
+      <div id="pasteResult" style="margin-top:0.75rem; display:none;"></div>
+    </div>
+
+    <!-- Preview Before Send -->
+    <div class="card" style="margin-top:1.5rem;">
+      <h2 style="font-size:1rem; margin-bottom:0.75rem;">תצוגה מקדימה לפני שליחה</h2>
+      <p style="color:#94a3b8; font-size:0.85rem; margin-bottom:0.75rem;">בודק איך תיראה ההזמנה ל-3 האורחים הראשונים שבסטטוס "ממתין" — בלי לשלוח כלום.</p>
+      <div style="display:flex; gap:0.75rem; align-items:flex-end;">
+        <button class="btn btn-primary" onclick="previewInvitation()" id="previewBtn">הצג תצוגה מקדימה</button>
+      </div>
+      <div id="previewResult" style="margin-top:0.75rem; display:none;"></div>
+    </div>
   </div>
 
   <!-- Add/Edit Modal -->
@@ -344,6 +370,98 @@
       } finally {
         btn.disabled = false;
         btn.textContent = 'ייבוא';
+      }
+    }
+
+    async function importPaste() {
+      var btn = document.getElementById('pasteBtn');
+      var resultDiv = document.getElementById('pasteResult');
+      var text = document.getElementById('pasteText').value.trim();
+      if (!text) { showToast('נא להדביק רשימה', 'error'); return; }
+      btn.disabled = true;
+      btn.textContent = 'מייבא...';
+      resultDiv.style.display = 'none';
+      try {
+        var result = await api('/import-paste', { method: 'POST', body: JSON.stringify({ text: text }) });
+        var msg = 'יובאו: ' + (result.imported || 0) + ' / ' + (result.total || 0);
+        if (result.skipped) msg += ' (דולגו: ' + result.skipped + ')';
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = result.imported > 0 ? '#4ade80' : '#fbbf24';
+        resultDiv.textContent = msg;
+        if (result.errors && result.errors.length) {
+          var errList = document.createElement('ul');
+          errList.style.marginTop = '0.5rem';
+          errList.style.color = '#f87171';
+          errList.style.fontSize = '0.85rem';
+          for (var i = 0; i < Math.min(result.errors.length, 10); i++) {
+            var li = document.createElement('li');
+            li.textContent = result.errors[i];
+            errList.appendChild(li);
+          }
+          if (result.errors.length > 10) {
+            var li2 = document.createElement('li');
+            li2.textContent = '… ועוד ' + (result.errors.length - 10) + ' שגיאות';
+            errList.appendChild(li2);
+          }
+          resultDiv.appendChild(errList);
+        }
+        showToast(msg, result.imported > 0 ? 'success' : 'error');
+        if (result.imported > 0) { document.getElementById('pasteText').value = ''; loadGuests(); }
+      } catch (err) {
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#f87171';
+        resultDiv.textContent = 'שגיאה: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'ייבוא מההדבקה';
+      }
+    }
+
+    async function previewInvitation() {
+      var btn = document.getElementById('previewBtn');
+      var resultDiv = document.getElementById('previewResult');
+      btn.disabled = true;
+      btn.textContent = 'טוען...';
+      try {
+        var result = await api('/preview-invitation', { method: 'POST', body: JSON.stringify({}) });
+        resultDiv.style.display = 'block';
+        resultDiv.textContent = '';
+        var header = document.createElement('div');
+        header.style.marginBottom = '0.75rem';
+        header.style.color = '#cbd5e1';
+        header.textContent = 'ישלחו ל-' + result.total_to_send + ' אורחים • ערוץ: ' + result.channel_strategy + ' • תבנית WhatsApp: ' + (result.whatsapp_template_configured ? '✓ מוגדרת' : '✗ לא מוגדרת (ישלח טקסט חופשי)');
+        resultDiv.appendChild(header);
+        for (var s of result.samples) {
+          var block = document.createElement('div');
+          block.style.background = '#1e293b';
+          block.style.padding = '0.75rem';
+          block.style.marginBottom = '0.5rem';
+          block.style.borderRadius = '6px';
+          var name = document.createElement('strong');
+          name.textContent = s.name + ' (' + s.phone + ')';
+          name.style.color = '#0ea5e9';
+          block.appendChild(name);
+          var body = document.createElement('pre');
+          body.style.whiteSpace = 'pre-wrap';
+          body.style.marginTop = '0.5rem';
+          body.style.color = '#f1f5f9';
+          body.textContent = s.rendered;
+          block.appendChild(body);
+          resultDiv.appendChild(block);
+        }
+        if (!result.samples.length) {
+          var empty = document.createElement('div');
+          empty.style.color = '#94a3b8';
+          empty.textContent = 'אין אורחים בסטטוס "ממתין" לתצוגה מקדימה.';
+          resultDiv.appendChild(empty);
+        }
+      } catch (err) {
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#f87171';
+        resultDiv.textContent = 'שגיאה: ' + err.message;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'הצג תצוגה מקדימה';
       }
     }
 

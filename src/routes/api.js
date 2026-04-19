@@ -140,8 +140,10 @@ router.post('/send-invitations', async (req, res) => {
     const { sendToGuest } = require('../services/twilio');
     const { createFirstReminder } = require('../services/reminder');
     const template = getSetting('invitation_template') || 'שלום {{name}}, אתם מוזמנים לחתונה של נתנאל ועמית!';
+    const templateSid = getSetting('whatsapp_template_invitation_sid') || null;
     const batchSize = parseInt(getSetting('batch_size') || '10');
     const batchDelay = parseInt(getSetting('batch_delay_seconds') || '60') * 1000;
+    const channelOverride = req.body.channel || null; // 'whatsapp' | 'sms' | 'auto' | 'both' | null
 
     let sql = "SELECT * FROM guests WHERE status = 'pending'";
     const params = [];
@@ -158,7 +160,12 @@ router.post('/send-invitations', async (req, res) => {
         const g = guests[i];
         const body = template.replace(/\{\{name\}\}/g, g.name);
         try {
-          await sendToGuest(g, body);
+          const opts = { channel: channelOverride || undefined };
+          if (templateSid) {
+            opts.templateSid = templateSid;
+            opts.templateVariables = { "1": g.name };
+          }
+          await sendToGuest(g, body, opts);
           db.prepare("UPDATE guests SET status = 'invited' WHERE id = ?").run(g.id);
           createFirstReminder(g.id);
           sent++;
@@ -173,6 +180,39 @@ router.post('/send-invitations', async (req, res) => {
     })().catch(err => console.error('Bulk send failed:', err));
 
     res.json({ sent: 0, total, message: 'מתחיל שליחה ל-' + total + ' אורחים...' });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/preview-invitation — returns the rendered body for the first N pending guests, without sending
+router.post('/preview-invitation', (req, res) => {
+  const db = getDb();
+  const template = getSetting('invitation_template') || 'שלום {{name}}, אתם מוזמנים לחתונה של נתנאל ועמית!';
+  let sql = "SELECT * FROM guests WHERE status = 'pending'";
+  const params = [];
+  if (req.body.group) { sql += ' AND group_name LIKE ?'; params.push('%' + req.body.group + '%'); }
+  const guests = db.prepare(sql + ' LIMIT 3').all(...params);
+  const total = db.prepare(sql.replace('SELECT *', 'SELECT COUNT(*) as c')).get(...params).c;
+  res.json({
+    total_to_send: total,
+    samples: guests.map(g => ({
+      name: g.name,
+      phone: g.phone,
+      rendered: template.replace(/\{\{name\}\}/g, g.name)
+    })),
+    channel_strategy: req.body.channel || getSetting('default_channel') || 'auto',
+    whatsapp_template_configured: Boolean(getSetting('whatsapp_template_invitation_sid'))
+  });
+});
+
+// POST /api/import-paste — import guests from pasted "name, phone, side, group" lines
+router.post('/import-paste', (req, res) => {
+  try {
+    const { importPasted } = require('../services/importer');
+    const { text } = req.body;
+    if (!text || typeof text !== 'string') return res.status(400).json({ error: 'text field required' });
+    res.json(importPasted(text));
   } catch (e) {
     res.status(500).json({ error: e.message });
   }

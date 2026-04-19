@@ -57,7 +57,11 @@ async function processDueReminders() {
 
     const body = template.replace('{{name}}', r.name);
     try {
-      await sendToGuest({ id: r.guest_id, phone: r.phone }, body);
+      const reminderTemplateSid = getSetting('whatsapp_template_reminder_sid') || null;
+      const opts = reminderTemplateSid
+        ? { templateSid: reminderTemplateSid, templateVariables: { "1": r.name } }
+        : {};
+      await sendToGuest({ id: r.guest_id, phone: r.phone }, body, opts);
       db.prepare("UPDATE reminders SET status = 'sent', sent_at = datetime('now') WHERE id = ?").run(r.id);
 
       // Schedule next reminder

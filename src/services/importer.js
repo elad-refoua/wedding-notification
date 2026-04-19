@@ -143,4 +143,41 @@ function exportExcel(statusFilter) {
   return exportExcelWithDb(filePath, getDb(), statusFilter);
 }
 
-module.exports = { importExcel, importExcelFromBuffer, exportExcel, importExcelWithDb, exportExcelWithDb };
+/**
+ * Import guests from pasted text. Each non-empty line is one guest. Separators: tab, comma, or semicolon.
+ * Column order (first 4): name, phone, [side (חתן/כלה/groom/bride)], [group].
+ * Lines missing name or phone are skipped and reported. Invalid phones are reported.
+ * Duplicate phones (by UNIQUE constraint) are reported.
+ */
+function importPastedWithDb(text, db) {
+  let imported = 0, skipped = 0;
+  const errors = [];
+  const insert = db.prepare('INSERT INTO guests (name, phone, side, group_name, num_invited, notes) VALUES (?,?,?,?,?,?)');
+
+  const lines = (text || '').split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+  for (const line of lines) {
+    const cols = line.split(/[\t,;]/).map(c => c.trim());
+    if (cols.length < 2) { skipped++; errors.push('Not enough columns: ' + line); continue; }
+    const [name, rawPhone, rawSide, rawGroup] = cols;
+    if (!name) { skipped++; errors.push('Missing name: ' + line); continue; }
+    const phone = normalizePhone(rawPhone || '');
+    if (!phone) { skipped++; errors.push('Invalid phone: ' + (rawPhone || 'empty')); continue; }
+    const side = SIDE_MAP[(rawSide || '').trim()] || null;
+    const group = (rawGroup || '').trim() || null;
+    try {
+      insert.run(name, phone, side, group, 1, null);
+      imported++;
+    } catch (e) {
+      skipped++;
+      errors.push(e.message.includes('UNIQUE') ? 'Duplicate: ' + phone : e.message);
+    }
+  }
+  return { imported, skipped, total: lines.length, errors };
+}
+
+function importPasted(text) {
+  return importPastedWithDb(text, getDb());
+}
+
+module.exports = { importExcel, importExcelFromBuffer, exportExcel, importExcelWithDb, exportExcelWithDb, importPasted, importPastedWithDb };

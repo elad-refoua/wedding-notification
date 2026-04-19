@@ -68,7 +68,36 @@
         <div class="form-group" style="display:flex; align-items:center; gap:0.75rem; padding-top:1.5rem;">
           <input type="checkbox" id="sWhatsappEnabled">
           <label for="sWhatsappEnabled" style="margin:0; color:#f1f5f9; font-size:0.95rem;">WhatsApp מופעל</label>
-          <small class="field-help" style="margin-right:auto;">כשמסומן, הודעות נשלחות בוואטסאפ. כשלא — ב-SMS בלבד.</small>
+          <small class="field-help" style="margin-right:auto;">כשמסומן, המערכת יכולה לשלוח גם בוואטסאפ (לפי ערוץ ברירת המחדל למטה).</small>
+        </div>
+
+        <!-- Channel Strategy -->
+        <div class="form-group">
+          <label>ערוץ ברירת מחדל</label>
+          <small class="field-help">אוטומטי = וואטסאפ קודם, וב-SMS רק אם נכשל (לא כפילות).</small>
+          <select id="sDefaultChannel">
+            <option value="auto">אוטומטי (וואטסאפ עם נפילה ל-SMS)</option>
+            <option value="whatsapp">וואטסאפ בלבד</option>
+            <option value="sms">SMS בלבד</option>
+            <option value="both">שניהם (למרות הכפילות)</option>
+          </select>
+        </div>
+
+        <!-- WhatsApp Business Template SIDs -->
+        <div class="form-group full-width">
+          <label>מזהה תבנית WhatsApp — הזמנה (HX...)</label>
+          <small class="field-help">לאחר שמטא יאשרו את תבנית ההזמנה (ראה docs/WHATSAPP_TEMPLATES.md), העתק את ה-Content SID מה-Twilio Console לכאן. ללא זה נשלח טקסט חופשי (עובד בסנדבוקס, לא עובד מול שולח WABA).</small>
+          <input type="text" id="sTplInviteSid" dir="ltr" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+        </div>
+        <div class="form-group full-width">
+          <label>מזהה תבנית WhatsApp — תזכורת (HX...)</label>
+          <small class="field-help">ה-Content SID של תבנית התזכורת, אחרי אישור מטא.</small>
+          <input type="text" id="sTplReminderSid" dir="ltr" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
+        </div>
+        <div class="form-group full-width">
+          <label>מזהה תבנית WhatsApp — תודה (HX...)</label>
+          <small class="field-help">ה-Content SID של תבנית התודה לאחר אישור הגעה.</small>
+          <input type="text" id="sTplThankyouSid" dir="ltr" placeholder="HXxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx">
         </div>
 
         <!-- Admin -->
@@ -122,6 +151,10 @@
       batch_size: 'sBatchSize',
       batch_delay_seconds: 'sBatchDelay',
       whatsapp_enabled: 'sWhatsappEnabled',
+      default_channel: 'sDefaultChannel',
+      whatsapp_template_invitation_sid: 'sTplInviteSid',
+      whatsapp_template_reminder_sid: 'sTplReminderSid',
+      whatsapp_template_thankyou_sid: 'sTplThankyouSid',
       admin_phones: 'sAdminPhones',
       milestone_thresholds: 'sMilestones'
     };
