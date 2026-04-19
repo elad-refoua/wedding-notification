@@ -120,6 +120,19 @@
     </div>
   </div>
 
+  <!-- Per-guest journey panel -->
+  <div class="modal-overlay" id="guestPanelModal">
+    <div class="modal" style="max-width:640px;">
+      <div class="modal-header">
+        <h2 id="panelTitle">אורח</h2>
+        <button class="modal-close" onclick="closePanel()">&times;</button>
+      </div>
+      <div id="panelBody">
+        <div class="empty-state"><span class="spinner"></span>טוען...</div>
+      </div>
+    </div>
+  </div>
+
   <!-- Add/Edit Modal -->
   <div class="modal-overlay" id="guestModal">
     <div class="modal">
@@ -221,14 +234,22 @@
 
       allGuests.forEach(function(g) {
         var tr = document.createElement('tr');
+        tr.style.cursor = 'pointer';
+        tr.addEventListener('click', function(e) {
+          if (e.target.tagName === 'BUTTON' || e.target.closest('button')) return;
+          openGuestPanel(g.id);
+        });
 
         var tdName = document.createElement('td');
         tdName.textContent = g.name;
+        tdName.style.fontWeight = '600';
         tr.appendChild(tdName);
 
         var tdPhone = document.createElement('td');
         tdPhone.dir = 'ltr';
         tdPhone.style.textAlign = 'right';
+        tdPhone.style.fontFamily = 'monospace';
+        tdPhone.style.fontSize = '0.85rem';
         tdPhone.textContent = g.phone;
         tr.appendChild(tdPhone);
 
@@ -245,6 +266,14 @@
         badge.className = statusClass(g.status);
         badge.textContent = statusLabel(g.status);
         tdStatus.appendChild(badge);
+        if (g.reminders_paused) {
+          var pBadge = document.createElement('span');
+          pBadge.className = 'badge badge-dark';
+          pBadge.style.marginRight = '0.3rem';
+          pBadge.textContent = '⏸';
+          pBadge.title = 'תזכורות מושהות';
+          tdStatus.appendChild(pBadge);
+        }
         tr.appendChild(tdStatus);
 
         var tdInvited = document.createElement('td');
@@ -253,6 +282,10 @@
 
         var tdComing = document.createElement('td');
         tdComing.textContent = g.num_coming || 0;
+        if (g.status === 'coming' && g.num_coming > 0) {
+          tdComing.style.color = 'var(--accent-green)';
+          tdComing.style.fontWeight = '600';
+        }
         tr.appendChild(tdComing);
 
         var tdActions = document.createElement('td');
@@ -386,6 +419,242 @@
         btn.textContent = 'ייבוא';
       }
     }
+
+    // ═════════════ Per-guest journey panel ═════════════
+    const PANEL_STATUS_LABEL = {
+      sent: '✓ נשלח', delivered: '✓✓ נמסר', read: '✓✓ נקרא',
+      failed: '✗ נכשל', undelivered: '✗ לא נמסר', received: '💬 תשובה'
+    };
+    const PANEL_STATUS_BADGE = {
+      sent: 'badge-success', delivered: 'badge-success', read: 'badge-success',
+      failed: 'badge-danger', undelivered: 'badge-danger', received: 'badge-info'
+    };
+
+    function fmtPanelTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      return d.toLocaleString('he-IL', { timeZone: 'Asia/Jerusalem', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function nextActionForGuest(guest, messages) {
+      const outgoing = messages.filter(m => m.direction === 'outgoing');
+      const lastOut = outgoing[outgoing.length - 1];
+      const hasSuccessfulOut = outgoing.some(m => m.status === 'sent' || m.status === 'delivered' || m.status === 'read');
+      if (guest.status === 'coming') return { text: 'אישר/ה הגעה. אין פעולה נדרשת.', color: 'var(--accent-green)' };
+      if (guest.status === 'not_coming') return { text: 'לא מגיע/ה. אין פעולה נדרשת.', color: 'var(--text-muted)' };
+      if (guest.status === 'opted_out') return { text: 'ביקש/ה להסיר. אין פעולה נדרשת.', color: 'var(--text-muted)' };
+      if (guest.status === 'pending' && !outgoing.length) return { text: 'הזמנה עוד לא נשלחה. לחץ "שלח הזמנה עכשיו".', color: 'var(--accent-blue)' };
+      if (lastOut && (lastOut.status === 'failed' || lastOut.status === 'undelivered')) return { text: 'ההזמנה נכשלה — נסה שוב (אולי בערוץ אחר).', color: 'var(--accent-red)' };
+      if (hasSuccessfulOut && guest.status === 'invited') {
+        if (guest.reminders_paused) return { text: 'הוזמן/ה, ממתין/ה לתשובה. תזכורות מושהות ידנית.', color: 'var(--accent-yellow)' };
+        return { text: 'הוזמן/ה, ממתין/ה לתשובה. תזכורות אוטומטיות פעילות.', color: 'var(--text-secondary)' };
+      }
+      if (guest.status === 'undecided') return { text: 'מתלבט/ת. ניתן לשלוח תזכורת ידנית או לחכות.', color: 'var(--accent-yellow)' };
+      return { text: 'סטטוס: ' + statusLabel(guest.status), color: 'var(--text-secondary)' };
+    }
+
+    async function openGuestPanel(guestId) {
+      const modal = document.getElementById('guestPanelModal');
+      const body = document.getElementById('panelBody');
+      document.getElementById('panelTitle').textContent = 'טוען...';
+      body.textContent = '';
+      const loading = document.createElement('div');
+      loading.className = 'empty-state';
+      var spinEl = document.createElement('span'); spinEl.className = 'spinner'; loading.appendChild(spinEl);
+      loading.appendChild(document.createTextNode('טוען...'));
+      body.appendChild(loading);
+      modal.classList.add('open');
+
+      try {
+        const data = await api('/guests/' + guestId + '/timeline');
+        document.getElementById('panelTitle').textContent = data.guest.name;
+        renderPanel(data);
+      } catch (e) {
+        body.textContent = '';
+        const err = document.createElement('div');
+        err.className = 'empty-state';
+        err.style.color = 'var(--accent-red)';
+        err.textContent = 'שגיאה: ' + e.message;
+        body.appendChild(err);
+      }
+    }
+
+    function closePanel() {
+      document.getElementById('guestPanelModal').classList.remove('open');
+    }
+
+    function renderPanel(data) {
+      const body = document.getElementById('panelBody');
+      body.textContent = '';
+      const guest = data.guest;
+
+      // Summary card
+      const sum = document.createElement('div');
+      sum.style.cssText = 'display:grid; grid-template-columns: 1fr 1fr; gap: 0.5rem 1.25rem; margin-bottom: 1rem; font-size: 0.88rem;';
+      const addInfo = (label, value) => {
+        const l = document.createElement('div'); l.style.color = 'var(--text-muted)'; l.style.fontSize = '0.78rem'; l.textContent = label; sum.appendChild(l);
+        const v = document.createElement('div'); v.style.color = 'var(--text-primary)'; v.textContent = value || '—'; sum.appendChild(v);
+      };
+      addInfo('טלפון', guest.phone);
+      addInfo('צד', sideLabel(guest.side));
+      addInfo('קבוצה', guest.group_name || '—');
+      addInfo('מוזמנים / מגיעים', (guest.num_invited || 0) + ' / ' + (guest.num_coming || 0));
+
+      const statusRow = document.createElement('div');
+      statusRow.style.cssText = 'grid-column: 1 / -1; padding-top: 0.25rem;';
+      const sBadge = document.createElement('span'); sBadge.className = statusClass(guest.status); sBadge.textContent = statusLabel(guest.status);
+      statusRow.appendChild(sBadge);
+      if (guest.reminders_paused) {
+        const p = document.createElement('span'); p.className = 'badge badge-dark'; p.style.marginRight = '0.4rem'; p.textContent = '⏸ תזכורות מושהות';
+        statusRow.appendChild(p);
+      }
+      sum.appendChild(statusRow);
+      body.appendChild(sum);
+
+      // Next-action box
+      const next = nextActionForGuest(guest, data.messages);
+      const nextBox = document.createElement('div');
+      nextBox.style.cssText = 'background: var(--bg-inner); border: 1px solid var(--border); border-right: 3px solid ' + next.color + '; border-radius: 8px; padding: 0.7rem 1rem; margin-bottom: 1rem;';
+      const nextLabel = document.createElement('div'); nextLabel.style.cssText = 'font-size: 0.75rem; color: var(--text-muted); margin-bottom: 0.2rem;'; nextLabel.textContent = 'מה הלאה?';
+      const nextText = document.createElement('div'); nextText.style.color = 'var(--text-primary)'; nextText.textContent = next.text;
+      nextBox.appendChild(nextLabel); nextBox.appendChild(nextText);
+      body.appendChild(nextBox);
+
+      // Quick actions
+      const actions = document.createElement('div');
+      actions.style.cssText = 'display:flex; gap:0.4rem; flex-wrap:wrap; margin-bottom: 1.15rem; padding-bottom: 1.15rem; border-bottom: 1px solid var(--border);';
+      const mkBtn = (cls, txt, fn) => { const b = document.createElement('button'); b.className = 'btn ' + cls + ' btn-sm'; b.textContent = txt; b.onclick = fn; return b; };
+
+      const outgoing = data.messages.filter(m => m.direction === 'outgoing');
+      const lastOut = outgoing[outgoing.length - 1];
+      if (!outgoing.length) {
+        actions.appendChild(mkBtn('btn-primary', 'שלח הזמנה עכשיו', () => sendInvitationToOne(guest.id)));
+      } else if (lastOut && (lastOut.status === 'failed' || lastOut.status === 'undelivered')) {
+        actions.appendChild(mkBtn('btn-warning', 'שלח שוב', () => resendLastForGuest(lastOut.id, guest.id)));
+      } else {
+        actions.appendChild(mkBtn('btn-secondary', 'שלח תזכורת עכשיו', () => sendInvitationToOne(guest.id)));
+      }
+
+      if (guest.status !== 'coming') {
+        actions.appendChild(mkBtn('btn-success', 'סמן כמגיע', () => markStatus(guest.id, 'coming', guest.num_invited)));
+      }
+      if (guest.status !== 'not_coming') {
+        actions.appendChild(mkBtn('btn-danger', 'סמן כלא מגיע', () => markStatus(guest.id, 'not_coming', 0)));
+      }
+
+      if (guest.reminders_paused) {
+        actions.appendChild(mkBtn('btn-secondary', '▶ חדש תזכורות', () => toggleRemindersInPanel(guest.id, guest.name, true)));
+      } else {
+        actions.appendChild(mkBtn('btn-secondary', '⏸ השהה תזכורות', () => toggleRemindersInPanel(guest.id, guest.name, false)));
+      }
+
+      actions.appendChild(mkBtn('btn-secondary', 'ערוך פרטים', () => { closePanel(); editGuest(guest.id); }));
+
+      body.appendChild(actions);
+
+      // Timeline
+      const tlHeader = document.createElement('h3');
+      tlHeader.className = 'section-title';
+      tlHeader.textContent = 'ציר הזמן';
+      tlHeader.style.marginBottom = '0.75rem';
+      body.appendChild(tlHeader);
+
+      const items = [];
+      for (const m of data.messages) items.push({ when: m.created_at, kind: 'message', data: m });
+      for (const r of data.reminders) items.push({ when: r.scheduled_at, kind: 'reminder', data: r });
+      items.sort((a, b) => new Date(a.when.replace(' ', 'T') + 'Z') - new Date(b.when.replace(' ', 'T') + 'Z'));
+
+      if (!items.length) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.style.padding = '1.25rem';
+        empty.textContent = 'אין עדיין אירועים לאורח זה.';
+        body.appendChild(empty);
+        return;
+      }
+
+      const tl = document.createElement('div');
+      tl.style.cssText = 'display:flex; flex-direction:column; gap:0.5rem;';
+      for (const it of items) {
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex; gap:0.6rem; padding:0.55rem 0.75rem; background: var(--bg-inner); border-radius: 6px; border-right: 3px solid var(--border); font-size: 0.85rem;';
+
+        const t = document.createElement('div');
+        t.style.cssText = 'color: var(--text-muted); font-size:0.76rem; min-width: 92px; direction: ltr;';
+        t.textContent = fmtPanelTime(it.when);
+        row.appendChild(t);
+
+        const content = document.createElement('div'); content.style.flex = '1';
+
+        if (it.kind === 'message') {
+          const m = it.data;
+          row.style.borderRightColor = (m.status === 'failed' || m.status === 'undelivered') ? 'var(--accent-red)' : (m.status === 'received' ? 'var(--accent-blue)' : 'var(--accent-green)');
+
+          const badges = document.createElement('div'); badges.style.cssText = 'display:flex; gap:0.3rem; margin-bottom:0.25rem; flex-wrap:wrap;';
+          const st = document.createElement('span'); st.className = 'badge ' + (PANEL_STATUS_BADGE[m.status] || 'badge-secondary'); st.textContent = PANEL_STATUS_LABEL[m.status] || m.status; badges.appendChild(st);
+          const ch = document.createElement('span'); ch.className = 'badge ' + (m.channel === 'whatsapp' ? 'badge-success' : 'badge-secondary'); ch.textContent = m.channel === 'whatsapp' ? 'WA' : 'SMS'; badges.appendChild(ch);
+          const dir = document.createElement('span'); dir.style.cssText = 'color: var(--text-muted); font-size:0.75rem;'; dir.textContent = m.direction === 'outgoing' ? '← יוצא' : '→ נכנס'; badges.appendChild(dir);
+          content.appendChild(badges);
+
+          if (m.content) {
+            const msgBody = document.createElement('div'); msgBody.style.cssText = 'color: var(--text-data); white-space: pre-wrap; font-size:0.85rem;'; msgBody.textContent = m.content; content.appendChild(msgBody);
+          }
+          if ((m.status === 'failed' || m.status === 'undelivered') && m.error) {
+            const err = document.createElement('div'); err.style.cssText = 'color: var(--accent-red); font-size:0.78rem; margin-top: 0.25rem;'; err.textContent = '⚠ ' + m.error; content.appendChild(err);
+          }
+        } else {
+          const r = it.data;
+          const color = r.status === 'sent' ? 'var(--accent-green)' : (r.status === 'pending' ? 'var(--accent-yellow)' : 'var(--text-muted)');
+          row.style.borderRightColor = color;
+          const label = document.createElement('div'); label.style.color = 'var(--text-primary)';
+          const statusText = r.status === 'pending' ? 'מתוכנן' : (r.status === 'sent' ? 'נשלח' : 'בוטל');
+          label.textContent = 'תזכורת #' + r.reminder_num + ' — ' + statusText;
+          content.appendChild(label);
+        }
+        row.appendChild(content);
+        tl.appendChild(row);
+      }
+      body.appendChild(tl);
+    }
+
+    async function sendInvitationToOne(guestId) {
+      try {
+        await api('/send-invitations', { method: 'POST', body: JSON.stringify({}) });
+        showToast('השליחה החלה', 'success');
+        setTimeout(() => openGuestPanel(guestId), 2000);
+      } catch (e) { showToast('שגיאה: ' + e.message, 'error'); }
+    }
+
+    async function resendLastForGuest(messageId, guestId) {
+      try {
+        const r = await api('/messages/' + messageId + '/resend', { method: 'POST', body: '{}' });
+        showToast(r.delivered ? 'נשלח מחדש דרך ' + r.delivered : 'השליחה נכשלה — בדוק את הסיבה למטה', r.delivered ? 'success' : 'error');
+        setTimeout(() => openGuestPanel(guestId), 1500);
+      } catch (e) { showToast('שגיאה: ' + e.message, 'error'); }
+    }
+
+    async function markStatus(guestId, status, numComing) {
+      try {
+        await api('/guests/' + guestId, { method: 'PUT', body: JSON.stringify({ status: status, num_coming: numComing }) });
+        showToast('סטטוס עודכן', 'success');
+        openGuestPanel(guestId);
+        loadGuests();
+      } catch (e) { showToast('שגיאה: ' + e.message, 'error'); }
+    }
+
+    async function toggleRemindersInPanel(guestId, name, wasPaused) {
+      const action = wasPaused ? 'resume-reminders' : 'pause-reminders';
+      try {
+        await api('/guests/' + guestId + '/' + action, { method: 'POST', body: '{}' });
+        showToast(wasPaused ? 'תזכורות חודשו עבור ' + name : 'תזכורות הושהו עבור ' + name, 'success');
+        openGuestPanel(guestId);
+        loadGuests();
+      } catch (e) { showToast('שגיאה: ' + e.message, 'error'); }
+    }
+
+    document.getElementById('guestPanelModal').addEventListener('click', function(e) {
+      if (e.target === e.currentTarget) closePanel();
+    });
 
     async function toggleReminders(guestId, name, wasPaused) {
       var action = wasPaused ? 'resume-reminders' : 'pause-reminders';

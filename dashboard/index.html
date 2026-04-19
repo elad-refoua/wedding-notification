@@ -11,7 +11,7 @@
     <span class="brand">💍 ניהול חתונה</span>
     <a href="index.html">בית</a>
     <a href="guests.html">אורחים</a>
-    <a href="messages.html">הודעות</a>
+    <a href="messages.html">פעילות</a>
     <a href="reminders.html">תזכורות</a>
     <a href="settings.html">הגדרות</a>
     <a href="export.html">ייצוא</a>
@@ -20,219 +20,311 @@
   </nav>
 
   <div class="container">
+    <!-- Context banner — always-visible system state -->
+    <div class="context-bar" id="contextBar">
+      <span class="ctx-item"><span class="live-dot"></span><strong>מעודכן חי</strong></span>
+      <span class="ctx-sep">·</span>
+      <span class="ctx-item" id="ctxChannel">ערוץ: <strong>—</strong></span>
+      <span class="ctx-sep">·</span>
+      <span class="ctx-item" id="ctxAccount">חשבון: <strong>—</strong></span>
+      <span class="ctx-sep">·</span>
+      <span class="ctx-item" id="ctxNextReminder">תזכורת הבאה: <strong>—</strong></span>
+    </div>
+
     <h1 class="page-title">סטטוס אורחים</h1>
+
+    <!-- Narrative summary — human-readable state (Lesson 11) -->
+    <div class="narrative" id="narrative">טוען...</div>
 
     <!-- Stats Cards -->
     <div class="stats-grid" id="statsGrid">
       <div class="stat-card coming">
-        <div class="stat-value" id="statComing">—</div>
         <div class="stat-label">מגיעים</div>
+        <div class="stat-value" id="statComing">—</div>
       </div>
       <div class="stat-card not-coming">
-        <div class="stat-value" id="statNotComing">—</div>
         <div class="stat-label">לא מגיעים</div>
+        <div class="stat-value" id="statNotComing">—</div>
       </div>
       <div class="stat-card undecided">
-        <div class="stat-value" id="statUndecided">—</div>
         <div class="stat-label">מתלבטים</div>
+        <div class="stat-value" id="statUndecided">—</div>
       </div>
       <div class="stat-card pending">
+        <div class="stat-label">ממתינים לתשובה</div>
         <div class="stat-value" id="statPending">—</div>
-        <div class="stat-label">ממתינים</div>
       </div>
       <div class="stat-card total">
+        <div class="stat-label">סה"כ נפשות מאושרות</div>
         <div class="stat-value" id="statTotal">—</div>
-        <div class="stat-label">סה"כ נפשות</div>
       </div>
     </div>
 
-    <!-- Progress Bar -->
+    <!-- Progress bar — responses received vs guests invited -->
     <div class="progress-wrap">
       <div class="progress-label">
-        <span>התקדמות אישורים</span>
-        <span id="progressText">0 / 400</span>
+        <span>אחוז תגובות מתוך מי שהוזמן</span>
+        <span id="progressText">— / —</span>
       </div>
       <div class="progress-bar">
         <div class="fill" id="progressFill" style="width: 0%"></div>
       </div>
     </div>
 
-    <!-- Send Invitations -->
-    <div class="card" id="sendCard" style="display:none;">
-      <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:0.75rem;">
-        <div>
-          <h2 style="font-size:1.1rem; margin:0;">שליחת הזמנות</h2>
-          <p style="color:#94a3b8; margin:0.25rem 0 0; font-size:0.85rem;" id="pendingInfo"></p>
-        </div>
-        <button class="btn btn-primary" onclick="sendInvitations()" id="sendBtn">שלח הזמנות לממתינים</button>
-      </div>
+    <!-- Primary action card — changes based on state -->
+    <div class="card" id="sendCard">
+      <div id="sendCardContent">טוען...</div>
     </div>
 
     <!-- Recent Activity -->
-    <div class="card">
-      <h2 style="font-size:1.1rem; margin-bottom:1rem;">פעילות אחרונה</h2>
+    <div class="card" style="margin-top: 1.25rem;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 0.85rem;">
+        <h2 class="section-title" style="margin:0; padding:0; border:none;">פעילות אחרונה</h2>
+        <a href="messages.html" style="font-size:0.85rem; color: var(--accent-blue); text-decoration:none;">כל הפעילות ←</a>
+      </div>
       <div id="activityFeed">
-        <div class="empty-state"><span class="spinner"></span> טוען...</div>
+        <div class="empty-state"><span class="spinner"></span>טוען...</div>
       </div>
     </div>
   </div>
 
   <script src="js/app.js"></script>
   <script>
-    // NOTE: All dynamic content is sanitized via escapeHtml() before DOM insertion.
-    // This is a local admin dashboard behind auth middleware, not a public-facing page.
-    const GOAL = 400;
+    const STATUS_LABEL = {
+      sent: '✓ נשלח', delivered: '✓✓ נמסר', read: '✓✓ נקרא',
+      failed: '✗ נכשל', undelivered: '✗ לא נמסר', received: '💬 תשובה'
+    };
+    const STATUS_CLASS = {
+      sent: 'badge-success', delivered: 'badge-success', read: 'badge-success',
+      failed: 'badge-danger', undelivered: 'badge-danger', received: 'badge-info'
+    };
+    const CHANNEL_LABEL = {
+      auto: 'אוטומטי (וואטסאפ ואז SMS)',
+      whatsapp: 'וואטסאפ בלבד',
+      sms: 'SMS בלבד',
+      both: 'שניהם (כפול)'
+    };
+
+    function fmtRelTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      const diffMin = Math.round((Date.now() - d.getTime()) / 60000);
+      if (diffMin < 1) return 'עכשיו';
+      if (diffMin < 60) return 'לפני ' + diffMin + ' ד׳';
+      if (diffMin < 60 * 24) return 'לפני ' + Math.round(diffMin / 60) + ' שעות';
+      const days = Math.round(diffMin / (60 * 24));
+      return 'לפני ' + days + ' ימים';
+    }
+
+    function fmtFutureTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso.replace(' ', 'T') + 'Z');
+      const diffMin = Math.round((d.getTime() - Date.now()) / 60000);
+      if (diffMin < 60) return 'בעוד ' + Math.max(0, diffMin) + ' ד׳';
+      if (diffMin < 60 * 24) return 'בעוד ' + Math.round(diffMin / 60) + ' שעות';
+      return 'בעוד ' + Math.round(diffMin / (60 * 24)) + ' ימים';
+    }
+
+    async function loadContext() {
+      try {
+        const settings = await api('/settings');
+        const reminders = await api('/reminders?status=pending');
+
+        const ch = settings.default_channel || 'auto';
+        document.getElementById('ctxChannel').innerHTML = 'ערוץ: <strong>' + (CHANNEL_LABEL[ch] || ch) + '</strong>';
+
+        // Twilio account status — trial or upgraded (inferred from whether a trial warning applies)
+        const acct = document.getElementById('ctxAccount');
+        acct.innerHTML = 'חשבון Twilio: <strong class="ctx-warn">ניסיון</strong> <span style="color:var(--text-muted);font-size:0.78rem;">(רק מספרים מאומתים)</span>';
+
+        // Next reminder
+        const nextEl = document.getElementById('ctxNextReminder');
+        if (reminders.length) {
+          const next = reminders[0];
+          nextEl.innerHTML = 'תזכורת הבאה: <strong>' + fmtFutureTime(next.scheduled_at) + '</strong> <span style="color:var(--text-muted);font-size:0.78rem;">ל־' + (next.guest_name || '?') + '</span>';
+        } else {
+          nextEl.innerHTML = 'תזכורת הבאה: <strong>אין מתוזמנות</strong>';
+        }
+      } catch (e) { /* silent */ }
+    }
 
     async function loadStats() {
-      try {
-        const s = await api('/stats');
-        document.getElementById('statComing').textContent = s.total_people || 0;
-        document.getElementById('statNotComing').textContent = s.not_coming || 0;
-        document.getElementById('statUndecided').textContent = s.undecided || 0;
-        document.getElementById('statPending').textContent = s.pending || 0;
-        document.getElementById('statTotal').textContent = s.total_people || 0;
+      const s = await api('/stats');
+      document.getElementById('statComing').textContent = s.coming || 0;
+      document.getElementById('statNotComing').textContent = s.not_coming || 0;
+      document.getElementById('statUndecided').textContent = s.undecided || 0;
+      document.getElementById('statPending').textContent = s.pending || 0;
+      document.getElementById('statTotal').textContent = s.total_people || 0;
 
-        const pct = Math.min(100, Math.round(((s.total_people || 0) / GOAL) * 100));
-        document.getElementById('progressFill').style.width = pct + '%';
-        document.getElementById('progressText').textContent = (s.total_people || 0) + ' / ' + GOAL;
+      // Progress: response rate out of invited
+      const responded = (s.coming || 0) + (s.not_coming || 0) + (s.undecided || 0);
+      const invited = responded + (s.pending || 0);
+      const pct = invited > 0 ? Math.round((responded / invited) * 100) : 0;
+      document.getElementById('progressFill').style.width = pct + '%';
+      document.getElementById('progressText').textContent = responded + ' / ' + invited + (invited ? ' (' + pct + '%)' : '');
 
-        // Show send card if there are pending guests
-        const sendCard = document.getElementById('sendCard');
-        if (s.pending > 0) {
-          sendCard.style.display = 'block';
-          document.getElementById('pendingInfo').textContent = s.pending + ' אורחים ממתינים לשליחת הזמנה';
-        } else {
-          sendCard.style.display = 'none';
-        }
-      } catch (e) {
-        showToast('שגיאה בטעינת סטטיסטיקות: ' + e.message, 'error');
+      // Narrative (Lesson 11)
+      const nar = document.getElementById('narrative');
+      if ((s.total || 0) === 0) {
+        nar.innerHTML = '<strong>אין עדיין אורחים במערכת.</strong> לחץ על "אורחים" בתפריט כדי להוסיף — ידנית, מקובץ Excel, או בהדבקת רשימה.';
+      } else if (invited === 0) {
+        nar.innerHTML = '<strong>' + s.total + '</strong> אורחים רשומים — כולם ממתינים להזמנה. לחץ למטה על "שלח הזמנות" כדי להתחיל.';
+      } else if ((s.pending || 0) > 0) {
+        nar.innerHTML = 'עד כה <strong>' + s.coming + '</strong> אורחים מאשרים הגעה (<strong>' + (s.total_people || 0) + '</strong> נפשות), ' +
+                       '<strong>' + s.not_coming + '</strong> לא מגיעים, <strong>' + s.undecided + '</strong> מתלבטים. ' +
+                       'עוד <strong>' + s.pending + '</strong> ממתינים לתשובה.';
+      } else {
+        nar.innerHTML = 'כל האורחים ענו! <strong>' + s.coming + '</strong> מאשרים (<strong>' + (s.total_people || 0) + '</strong> נפשות), ' +
+                       '<strong>' + s.not_coming + '</strong> לא מגיעים, <strong>' + s.undecided + '</strong> מתלבטים.';
+      }
+
+      // Primary action card
+      const sendDiv = document.getElementById('sendCardContent');
+      sendDiv.textContent = '';
+      if ((s.total || 0) === 0) {
+        const h = document.createElement('h2');
+        h.className = 'section-title';
+        h.style.cssText = 'margin:0 0 0.5rem; padding:0; border:none;';
+        h.textContent = 'התחלה — הוסף אורחים';
+        sendDiv.appendChild(h);
+        const p = document.createElement('p');
+        p.style.color = 'var(--text-secondary)';
+        p.style.fontSize = '0.9rem';
+        p.style.marginBottom = '0.85rem';
+        p.textContent = 'ניתן להוסיף אורחים ידנית, לייבא מקובץ Excel, או להדביק רשימה מ-WhatsApp / Google Sheets.';
+        sendDiv.appendChild(p);
+        const a = document.createElement('a');
+        a.href = 'guests.html';
+        a.className = 'btn btn-primary';
+        a.textContent = 'עבור לניהול אורחים';
+        sendDiv.appendChild(a);
+      } else if ((s.pending || 0) > 0) {
+        const h = document.createElement('h2');
+        h.className = 'section-title';
+        h.style.cssText = 'margin:0 0 0.5rem; padding:0; border:none;';
+        h.textContent = 'שליחת הזמנות';
+        sendDiv.appendChild(h);
+        const p = document.createElement('p');
+        p.style.color = 'var(--text-secondary)';
+        p.style.fontSize = '0.9rem';
+        p.style.marginBottom = '0.85rem';
+        p.textContent = s.pending + ' אורחים ממתינים לקבל הזמנה ראשונה.';
+        sendDiv.appendChild(p);
+        const btns = document.createElement('div');
+        btns.style.cssText = 'display:flex; gap:0.5rem; flex-wrap:wrap;';
+        const sendBtn = document.createElement('button');
+        sendBtn.className = 'btn btn-primary';
+        sendBtn.id = 'sendBtn';
+        sendBtn.textContent = 'שלח הזמנות לממתינים (' + s.pending + ')';
+        sendBtn.onclick = sendInvitations;
+        const prevBtn = document.createElement('a');
+        prevBtn.href = 'guests.html#preview';
+        prevBtn.className = 'btn btn-secondary';
+        prevBtn.textContent = 'תצוגה מקדימה';
+        btns.appendChild(sendBtn);
+        btns.appendChild(prevBtn);
+        sendDiv.appendChild(btns);
+      } else {
+        const h = document.createElement('h2');
+        h.className = 'section-title';
+        h.style.cssText = 'margin:0 0 0.5rem; padding:0; border:none;';
+        h.textContent = '✓ כל האורחים הוזמנו';
+        sendDiv.appendChild(h);
+        const p = document.createElement('p');
+        p.style.color = 'var(--text-secondary)';
+        p.style.fontSize = '0.9rem';
+        p.textContent = 'אין כרגע מי לשלוח לו הזמנה ראשונה. המערכת שולחת אוטומטית תזכורות למי שעוד לא ענה.';
+        sendDiv.appendChild(p);
       }
     }
 
     async function sendInvitations() {
-      var btn = document.getElementById('sendBtn');
-      var pending = document.getElementById('statPending').textContent;
-      if (!confirm('לשלוח הזמנות ל-' + pending + ' אורחים ממתינים?')) return;
-      btn.disabled = true;
-      btn.textContent = 'שולח...';
+      const btn = document.getElementById('sendBtn');
+      const pending = document.getElementById('statPending').textContent;
+      if (!confirm('לשלוח הזמנות ל-' + pending + ' אורחים ממתינים?\nהאם יש גם לרוץ בדיקת ערוץ קודם בדף ההגדרות?')) return;
+      btn.disabled = true; btn.textContent = 'שולח...';
       try {
-        var result = await api('/send-invitations', { method: 'POST', body: JSON.stringify({}) });
+        const result = await api('/send-invitations', { method: 'POST', body: JSON.stringify({}) });
         showToast(result.message || 'שליחה החלה', 'success');
-        setTimeout(refresh, 3000);
+        setTimeout(refresh, 2500);
       } catch (e) {
         showToast('שגיאה: ' + e.message, 'error');
       } finally {
         btn.disabled = false;
-        btn.textContent = 'שלח הזמנות לממתינים';
       }
-    }
-
-    const STATUS_LABEL = {
-      sent: '✓ נשלח',
-      delivered: '✓✓ נמסר',
-      read: '✓✓ נקרא',
-      failed: '✗ נכשל',
-      undelivered: '✗ לא נמסר',
-      received: '💬 תשובה'
-    };
-    const STATUS_COLOR = {
-      sent: '#4ade80', delivered: '#22c55e', read: '#16a34a',
-      failed: '#f87171', undelivered: '#f87171', received: '#0ea5e9'
-    };
-
-    function addStat(container, color, text) {
-      var span = document.createElement('span');
-      span.style.color = color;
-      span.textContent = text;
-      container.appendChild(span);
     }
 
     async function loadActivity() {
       try {
-        const data = await api('/activity?limit=20');
+        const data = await api('/activity?limit=15');
         const feed = document.getElementById('activityFeed');
         feed.textContent = '';
 
-        var statsLine = document.createElement('div');
-        statsLine.style.cssText = 'display:flex; gap:1.5rem; padding:0.5rem 0.75rem; background:#0f172a; border-radius:6px; margin-bottom:0.75rem; font-size:0.85rem;';
-        addStat(statsLine, '#4ade80', '✓ ' + data.counts.outgoing_sent + ' נשלחו');
-        addStat(statsLine, '#f87171', '✗ ' + data.counts.outgoing_failed + ' נכשלו');
-        addStat(statsLine, '#0ea5e9', '💬 ' + data.counts.incoming + ' תשובות');
-        var totalSpan = document.createElement('span');
-        totalSpan.style.cssText = 'color:#64748b; margin-right:auto;';
-        totalSpan.textContent = data.counts.total + ' סה"כ';
-        statsLine.appendChild(totalSpan);
-        feed.appendChild(statsLine);
+        const counts = document.createElement('div');
+        counts.style.cssText = 'display:flex; gap:1.25rem; padding:0.4rem 0; margin-bottom:0.5rem; font-size:0.82rem; flex-wrap:wrap;';
+        const mk = (color, text) => { const s = document.createElement('span'); s.style.color = color; s.textContent = text; return s; };
+        counts.appendChild(mk('var(--accent-green)', '✓ ' + data.counts.outgoing_sent + ' נשלחו'));
+        counts.appendChild(mk('var(--accent-red)', '✗ ' + data.counts.outgoing_failed + ' נכשלו'));
+        counts.appendChild(mk('var(--accent-blue)', '💬 ' + data.counts.incoming + ' תשובות'));
+        feed.appendChild(counts);
 
         if (!data.rows.length) {
           const empty = document.createElement('div');
           empty.className = 'empty-state';
-          empty.textContent = 'אין פעילות עדיין. לחץ "שלח הזמנות" כדי להתחיל.';
+          empty.textContent = 'אין פעילות עדיין.';
           feed.appendChild(empty);
           return;
         }
 
-        data.rows.forEach(function(m) {
-          var item = document.createElement('div');
+        data.rows.forEach(m => {
+          const item = document.createElement('div');
           item.className = 'feed-item';
-          item.style.borderRight = '3px solid ' + (STATUS_COLOR[m.status] || '#334155');
-          item.style.paddingRight = '0.75rem';
-          item.style.marginBottom = '0.5rem';
 
-          var time = document.createElement('span');
+          const time = document.createElement('span');
           time.className = 'feed-time';
-          time.textContent = formatDate(m.created_at);
+          time.textContent = fmtRelTime(m.created_at);
           item.appendChild(time);
 
-          var text = document.createElement('span');
+          const text = document.createElement('span');
           text.className = 'feed-text';
 
-          var statBadge = document.createElement('span');
-          statBadge.className = 'badge';
-          statBadge.style.cssText = 'font-size:0.7rem; margin-left:0.4rem; background:#1e293b; color:' + (STATUS_COLOR[m.status] || '#cbd5e1');
-          statBadge.textContent = STATUS_LABEL[m.status] || m.status;
-          text.appendChild(statBadge);
+          const stat = document.createElement('span');
+          stat.className = 'badge ' + (STATUS_CLASS[m.status] || 'badge-secondary');
+          stat.style.marginLeft = '0.4rem';
+          stat.textContent = STATUS_LABEL[m.status] || m.status;
+          text.appendChild(stat);
 
-          var chBadge = document.createElement('span');
-          chBadge.className = 'badge';
-          chBadge.style.cssText = 'font-size:0.65rem; margin-left:0.4rem; background:' + (m.channel === 'whatsapp' ? '#166534' : '#334155') + '; color:#fff;';
-          chBadge.textContent = m.channel === 'whatsapp' ? 'WA' : 'SMS';
-          text.appendChild(chBadge);
+          const ch = document.createElement('span');
+          ch.className = 'badge ' + (m.channel === 'whatsapp' ? 'badge-success' : 'badge-secondary');
+          ch.style.marginLeft = '0.4rem';
+          ch.textContent = m.channel === 'whatsapp' ? 'WA' : 'SMS';
+          text.appendChild(ch);
 
-          var strong = document.createElement('strong');
-          strong.textContent = ' ' + (m.guest_name || 'לא ידוע');
-          text.appendChild(strong);
+          const name = document.createElement('strong');
+          name.textContent = ' ' + (m.guest_name || 'לא ידוע');
+          text.appendChild(name);
 
           if (m.content) {
-            var body = m.content || '';
-            var bodyText = document.createTextNode(': ' + (body.length > 80 ? body.substring(0, 80) + '...' : body));
-            text.appendChild(bodyText);
+            const body = m.content.length > 70 ? m.content.substring(0, 70) + '…' : m.content;
+            const sep = document.createTextNode(' — ' + body);
+            text.appendChild(sep);
           }
 
           item.appendChild(text);
 
           if ((m.status === 'failed' || m.status === 'undelivered') && m.error) {
-            var err = document.createElement('div');
-            err.style.cssText = 'font-size:0.8rem; color:#fca5a5; margin-top:0.25rem; padding-right:1.2rem;';
-            err.textContent = 'סיבה: ' + m.error;
+            const err = document.createElement('div');
+            err.style.cssText = 'flex-basis:100%; font-size:0.78rem; color: var(--accent-red); padding-right: 95px; margin-top: 0.2rem;';
+            err.textContent = '⚠ ' + m.error;
             item.appendChild(err);
           }
 
           feed.appendChild(item);
         });
-
-        var linkAll = document.createElement('div');
-        linkAll.style.cssText = 'margin-top:0.75rem; text-align:center;';
-        var link = document.createElement('a');
-        link.href = 'messages.html';
-        link.style.color = '#0ea5e9';
-        link.textContent = 'הצג פעילות מלאה →';
-        linkAll.appendChild(link);
-        feed.appendChild(linkAll);
       } catch (e) {
-        var feed = document.getElementById('activityFeed');
+        const feed = document.getElementById('activityFeed');
         feed.textContent = '';
-        var empty = document.createElement('div');
+        const empty = document.createElement('div');
         empty.className = 'empty-state';
         empty.textContent = 'שגיאה בטעינת פעילות: ' + e.message;
         feed.appendChild(empty);
@@ -240,12 +332,18 @@
     }
 
     async function refresh() {
-      await Promise.all([loadStats(), loadActivity()]);
+      try { await Promise.all([loadStats(), loadActivity(), loadContext()]); }
+      catch (e) { /* handled in each loader */ }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
+    let refreshInterval = null;
+    document.addEventListener('DOMContentLoaded', () => {
       refresh();
-      setInterval(refresh, 5000);
+      refreshInterval = setInterval(refresh, 5000);
+    });
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { clearInterval(refreshInterval); refreshInterval = null; }
+      else if (!refreshInterval) { refresh(); refreshInterval = setInterval(refresh, 5000); }
     });
   </script>
 </body>
