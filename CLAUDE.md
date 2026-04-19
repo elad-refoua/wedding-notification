@@ -60,22 +60,44 @@ Never add other AI providers — Gemini is the only approved fallback.
 - **`DB_PATH` env var** picks the file location (defaults to `./guests.db` for local dev). On Cloud Run it's `/data/guests.db` where `/data` is a GCS Cloud Storage volume mount to `gs://wedding-netanel-amit-data` — the DB file is therefore durable across restarts/revisions.
 - **`DB_JOURNAL_MODE` env var** picks the journal mode. Local dev: `WAL` (default, fastest). Cloud Run (GCS FUSE): must be `DELETE` — WAL uses mmap which does not work over networked filesystems.
 - **Cloud Run single-writer constraint** — the service is deployed with `--max-instances 1` because SQLite over a shared GCS volume cannot tolerate concurrent writers. Do not raise this limit without switching databases.
-- Schema is **idempotent** — the entire `schema.sql` is re-applied on every `getDb()` call. New tables/columns must use `CREATE ... IF NOT EXISTS` / `INSERT OR IGNORE`. Column additions to existing tables use the `runMigrations()` pattern in `db.js` (see the `ALTER TABLE … ADD COLUMN error` migration for the template).
-- Settings are key/value strings in the `settings` table, accessed via `getSetting` / `setSetting`. Defaults (invitation template, reminder interval, batch size, Gemini quota, admin phones, etc.) are seeded from `schema.sql`.
-- Tables: `guests`, `messages` (incoming+outgoing log; `error` column captures Twilio failure detail), `reminders` (schedule+status), `settings`.
+- **UTF-8 locale is mandatory on Cloud Run** — Dockerfile sets `LANG=LC_ALL=LANGUAGE=C.UTF-8` + installs `locales` package. Without this, Node ↔ better-sqlite3 string-binding at the C boundary interprets Hebrew UTF-8 bytes as Latin-1 and writes each byte as a separate codepoint (mojibake). This was the root cause of the "Hebrew saved as question marks" bug.
+- Schema is **idempotent** — the entire `schema.sql` is re-applied on every `getDb()` call. New tables/columns must use `CREATE ... IF NOT EXISTS` / `INSERT OR IGNORE`. Column additions use `runMigrations()` in `db.js`.
+- **Schema-constraint migrations** (adding CHECK values, CASCADE to FKs, etc.) — SQLite can't ALTER constraints. Use the rebuild pattern already present in `runMigrations()`: detect the old constraint by introspecting `sqlite_master.sql` or `foreign_key_list`, then `CREATE table_new → INSERT SELECT → DROP table → RENAME new`. Examples: `maybeRebuildForCascade()` (messages/reminders FK CASCADE), `maybeRebuildGuestsForBoth()` (side CHECK allows 'both'). Triggers dropped with the old table must be recreated.
+- All PUT `/api/settings` write happens inside a single SQLite transaction — on the GCS FUSE volume, 14 sequential setSetting() calls cost ~13 seconds (one flush per write); one transaction drops it to ~0.6 sec. See `bulk.js` and `/settings` handler.
+- Settings are key/value strings in the `settings` table, accessed via `getSetting` / `setSetting`. Defaults seeded from `schema.sql`. Notable keys: `default_channel` (auto/whatsapp/sms/both), `wedding_mode` (global freeze), `whatsapp_template_invitation_sid` (HX… after Meta approval).
+- **Secrets never round-trip in GET /api/settings** — `gemini_api_key` is replaced with a boolean flag `gemini_api_key_set` so clients can't accidentally overwrite it with a masked value.
+- Tables: `guests` (with `side IN ('groom','bride','both')`, `reminders_paused`), `messages` (incoming+outgoing log; `error` column captures Twilio failure detail; indexed on direction+status, guest_id), `reminders` (schedule+status, indexed on guest_id, status+scheduled_at), `settings`.
+- FKs use `ON DELETE CASCADE` on messages.guest_id and reminders.guest_id — deleting a guest cleanly removes their history.
 
 ### Auth (`server.js`)
 - `/api/*` — Bearer token against `DASHBOARD_TOKEN`, compared with `crypto.timingSafeEqual`.
-  **Requests from `127.0.0.1` / `::1` bypass auth entirely** — localhost dev works with no token.
+- **Localhost bypass is dev-only**: requests from `127.0.0.1` / `::1` skip auth ONLY when `NODE_ENV !== 'production'`. In production this shortcut is closed because `trust proxy = true` means `req.ip` can be spoofed via `X-Forwarded-For: 127.0.0.1`. Check is on `req.socket.remoteAddress` directly.
 - `/dashboard/*` — static files; client-side JS stores token and adds it to API calls.
-- `/webhooks/*` — no Bearer auth; Twilio signature validated when `NODE_ENV=production`.
-- `app.set('trust proxy', true)` is required so `req.ip` reflects the real client behind Render's proxy.
+- `/webhooks/*` — no Bearer auth; Twilio signature validation is **always on** unless `DISABLE_TWILIO_SIG=1` is set explicitly (previously gated on NODE_ENV, which silently disabled sig checks on any misconfigured env).
 
 ### Phone normalization (`src/utils/phone.js`)
 All numbers are normalized to E.164 Israeli format (+972…) at every entry point (API, webhook, admin command, Excel import). `guests.phone` is `UNIQUE` — duplicates are returned as `409 Conflict`.
 
 ### Admin WhatsApp commands (`src/services/admin.js`)
 Phones listed in the `admin_phones` setting (comma-separated, normalized) can send Hebrew commands: `סטטוס`, `עזרה`, `שלח לכולם`, `שלח ל<קבוצה>`, `הוסף <שם> <טלפון> [חתן|כלה] [קבוצה]`, `עצור שליחה`, `המשך שליחה`. Admin messages are routed before guest-reply parsing.
+
+### Bulk-send serialization (`src/services/bulk.js`)
+All three bulk paths — `/api/send-invitations`, `/api/retry-failed`, admin "שלח לכולם" — share an in-process lock named `bulk_send`. A second attempt while one is running returns **409** with a Hebrew explanation. The lock also powers `/api/bulk-status` which the home-page dashboard polls to render a live progress card (sent/failed counts, current guest name, percentage).
+
+### Channel routing (`src/services/twilio.js`)
+`sendToGuest(guest, body, opts)` picks a channel strategy from `opts.channel` or the `default_channel` setting:
+- `auto` — WhatsApp first, SMS fallback on failure (one message actually delivered)
+- `whatsapp` — WhatsApp only (no silent SMS fallback)
+- `sms` — SMS only
+- `both` — both channels (legacy double-send, use sparingly)
+
+When `opts.templateSid` (HX…) is passed, the WhatsApp send uses Twilio Content API — required for business-initiated messages outside the 24h window on a real WABA sender. The invitation + reminder flows read the template SID from settings automatically.
+
+### Webhook status callback ladder (`src/routes/webhooks.js`)
+Twilio status callbacks (`sent → delivered → read`) can arrive out of order. `updateStatusFromCallback()` uses a `STATUS_RANK` table to reject regressions (e.g. a late `sent` callback after `delivered`). Terminal errors (`failed`, `undelivered`) always overwrite + store Twilio's error code + a Hebrew hint via `hebrewHint()`.
+
+### Per-guest journey panel (`dashboard/guests.html`)
+Clicking any row in the guests table opens a modal with the full timeline (messages + reminders merged chronologically), a "מה הלאה?" recommendation, and one-click quick actions. The modal helper (`openModal`/`closeModal` in `app.js`) requires the **overlay** element as input — it toggles `.open` on the overlay (which is what CSS `display: none → flex` gates on). Passing the inner `.modal` div is accepted (the helper auto-finds the overlay via `.closest('.modal-overlay')`), but passing the overlay is the canonical form.
 
 ## Environment Variables
 In production these come from Secret Manager (secrets) or `gcloud run services update --set-env-vars` (non-secrets). In local dev they come from `.env`.
