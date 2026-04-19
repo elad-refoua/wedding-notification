@@ -140,21 +140,28 @@ function showToast(message, type = 'info') {
 }
 
 // ──── Modal a11y helper ────
-// Call `openModal(modalEl)` after adding the `open` class. Focus-traps tab navigation
-// inside the modal, closes on Escape, restores focus to the trigger on close.
-// Modal elements must carry `role="dialog" aria-modal="true"` on their inner card.
+// Call openModal(overlayEl OR innerEl) — we figure out both.
+// The `.open` class always goes on the overlay (that's what the CSS `display:flex` gates on).
+// Focus trap + Escape operate on the inner .modal div (actual interactive content).
 const _modalStack = [];
-function openModal(modalEl) {
-  if (!modalEl) return;
+function _findOverlayAndInner(el) {
+  // Accepts either the overlay or the inner modal; returns both.
+  if (!el) return { overlay: null, inner: null };
+  if (el.classList && el.classList.contains('modal-overlay')) {
+    return { overlay: el, inner: el.querySelector('.modal') };
+  }
+  const overlay = el.closest ? el.closest('.modal-overlay') : null;
+  return { overlay, inner: el };
+}
+
+function openModal(el) {
+  const { overlay, inner } = _findOverlayAndInner(el);
+  if (!overlay) return;
   const trigger = document.activeElement;
   const handler = (e) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closeModal(modalEl);
-      return;
-    }
-    if (e.key === 'Tab') {
-      const focusables = modalEl.querySelectorAll('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+    if (e.key === 'Escape') { e.preventDefault(); closeModal(overlay); return; }
+    if (e.key === 'Tab' && inner) {
+      const focusables = inner.querySelectorAll('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
       if (!focusables.length) return;
       const first = focusables[0];
       const last = focusables[focusables.length - 1];
@@ -163,19 +170,23 @@ function openModal(modalEl) {
     }
   };
   document.body.style.overflow = 'hidden';
-  modalEl.addEventListener('keydown', handler);
-  _modalStack.push({ modalEl, handler, trigger });
-  // Focus first focusable element inside
-  const firstFocusable = modalEl.querySelector('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
-  if (firstFocusable) firstFocusable.focus();
+  (inner || overlay).addEventListener('keydown', handler);
+  _modalStack.push({ overlay, inner, handler, trigger });
+  overlay.classList.add('open');
+  if (inner) {
+    const firstFocusable = inner.querySelector('button:not([disabled]),[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])');
+    if (firstFocusable) firstFocusable.focus();
+  }
 }
 
-function closeModal(modalEl) {
-  if (!modalEl) return;
-  modalEl.classList.remove('open');
-  const entry = _modalStack.pop();
-  if (entry) {
-    entry.modalEl.removeEventListener('keydown', entry.handler);
+function closeModal(el) {
+  const { overlay, inner } = _findOverlayAndInner(el);
+  if (!overlay) return;
+  overlay.classList.remove('open'); // MUST be on overlay, not inner — CSS gates display on overlay.open
+  const idx = _modalStack.findIndex(e => e.overlay === overlay);
+  if (idx !== -1) {
+    const entry = _modalStack.splice(idx, 1)[0];
+    (entry.inner || entry.overlay).removeEventListener('keydown', entry.handler);
     if (entry.trigger && entry.trigger.focus) entry.trigger.focus();
   }
   if (!_modalStack.length) document.body.style.overflow = '';

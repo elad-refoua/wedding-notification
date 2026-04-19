@@ -338,14 +338,11 @@
       document.getElementById('fInvited').value = 1;
       document.getElementById('fComing').value = 0;
       populateGroupsDatalist();
-      var modal = document.getElementById('guestModal');
-      modal.classList.add('open');
-      openModal(modal.querySelector('.modal'));
+      openModal(document.getElementById('guestModal'));
     }
 
     function closeEditModal() {
-      var modal = document.getElementById('guestModal');
-      closeModal(modal.querySelector('.modal'));
+      closeModal(document.getElementById('guestModal'));
     }
 
     // Batch-D D4: datalist of existing groups
@@ -375,9 +372,7 @@
       document.getElementById('fStatus').value = g.status || 'pending';
       document.getElementById('fNotes').value = g.notes || '';
       populateGroupsDatalist();
-      var modal = document.getElementById('guestModal');
-      modal.classList.add('open');
-      openModal(modal.querySelector('.modal'));
+      openModal(document.getElementById('guestModal'));
     }
 
     async function saveGuest(e) {
@@ -485,7 +480,6 @@
 
     async function openGuestPanel(guestId) {
       const modalOverlay = document.getElementById('guestPanelModal');
-      const modalInner = modalOverlay.querySelector('.modal');
       const body = document.getElementById('panelBody');
       document.getElementById('panelTitle').textContent = 'טוען...';
       body.textContent = '';
@@ -494,8 +488,7 @@
       var spinEl = document.createElement('span'); spinEl.className = 'spinner'; loading.appendChild(spinEl);
       loading.appendChild(document.createTextNode('טוען...'));
       body.appendChild(loading);
-      modalOverlay.classList.add('open');
-      openModal(modalInner);
+      openModal(modalOverlay);
 
       try {
         const data = await api('/guests/' + guestId + '/timeline');
@@ -512,8 +505,7 @@
     }
 
     function closePanel() {
-      var modalOverlay = document.getElementById('guestPanelModal');
-      closeModal(modalOverlay.querySelector('.modal'));
+      closeModal(document.getElementById('guestPanelModal'));
     }
 
     function renderPanel(data) {
