@@ -222,6 +222,19 @@ tbody td {
 tbody tr:last-child td { border-bottom: none; }
 tbody tr:hover { background: rgba(56, 189, 248, 0.04); }
 
+/* Visual affordance for clickable rows — hover highlight + subtle "open" indicator.
+ * Applied to <tr role="button"> in the guests list. */
+tbody tr[role="button"] { transition: background 0.12s; }
+tbody tr[role="button"]:hover { background: rgba(56, 189, 248, 0.09); }
+tbody tr[role="button"]:hover td:last-child::after { content: none; } /* actions cell has its own buttons */
+tbody tr[role="button"] td:first-child::before {
+  content: "›"; color: var(--text-muted); margin-left: 0.4rem; font-size: 0.9em;
+  transition: color 0.12s, transform 0.12s; display: inline-block;
+}
+tbody tr[role="button"]:hover td:first-child::before,
+tbody tr[role="button"]:focus-visible td:first-child::before { color: var(--accent-blue); transform: translateX(-2px); }
+tbody tr[role="button"]:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: -2px; }
+
 /* ──── FORMS ──── */
 .form-group { margin-bottom: 0.9rem; }
 .form-group label {

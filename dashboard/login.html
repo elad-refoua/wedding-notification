@@ -57,12 +57,18 @@
     <h1>ניהול חתונה</h1>
     <p>נתנאל ועמית</p>
     <form id="loginForm">
-      <input type="password" id="token" placeholder="סיסמה" autocomplete="off" autofocus>
+      <label for="token" style="position:absolute;left:-9999px;">סיסמה</label>
+      <input type="password" id="token" placeholder="סיסמה" autocomplete="current-password" autofocus aria-describedby="error">
       <button type="submit">כניסה</button>
     </form>
-    <p class="error" id="error">סיסמה שגויה</p>
+    <p class="error" id="error" role="alert" aria-live="polite"></p>
   </div>
   <script>
+    function showError(msg) {
+      const el = document.getElementById('error');
+      el.textContent = msg;
+      el.style.display = 'block';
+    }
     document.getElementById('loginForm').addEventListener('submit', async (e) => {
       e.preventDefault();
       const token = document.getElementById('token').value.trim();
@@ -74,11 +80,13 @@
         if (res.ok) {
           sessionStorage.setItem('dashToken', token);
           location.href = '/dashboard/index.html';
+        } else if (res.status === 401) {
+          showError('סיסמה שגויה');
         } else {
-          document.getElementById('error').style.display = 'block';
+          showError('שגיאה: ' + res.status);
         }
-      } catch {
-        document.getElementById('error').style.display = 'block';
+      } catch (err) {
+        showError('שגיאת רשת — בדוק חיבור לאינטרנט');
       }
     });
     // If already logged in, redirect
